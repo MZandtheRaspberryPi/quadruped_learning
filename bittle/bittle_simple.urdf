@@ -1,0 +1,400 @@
+<?xml version="1.0"?>
+<robot name="bittle">
+  
+  # bittle body is about 127mm long, and 87mm wide at the longest point
+  # about 15.5mm thick at shoulders, thickest point
+
+  <material name="blue">
+    <color rgba="0 0 0.8 1"/>
+  </material>
+  <material name="black">
+    <color rgba="0 0 0 1"/>
+  </material>
+  <material name="white">
+    <color rgba="1 1 1 1"/>
+  </material>
+
+  <link name="base_link">
+    <visual>
+      <geometry>
+        <box size="0.127 0.087 0.0155"/>
+      </geometry>
+      <material name="white"/>
+    </visual>
+
+    <collision>
+      <geometry>
+        <box size="0.127 0.087 0.0155"/>
+      </geometry>
+    </collision>
+
+    <inertial>
+      <mass value="0.108"/>
+      <inertia ixx="0.01562" ixy="0" ixz="-2e-05" iyy="0.00613" iyz="0" izz="0.02107"/>
+    </inertial>
+  </link>
+
+  <link name="front_right_upper_leg">
+    <visual>
+      <geometry>
+        <box size="0.016 0.007 0.065"/>
+      </geometry>
+      <origin rpy="0 0 0" xyz="0 0 -0.0318"/>
+    </visual>
+
+    <collision>
+      <geometry>
+        <box size="0.016 0.007 0.065"/>
+      </geometry>
+      <origin rpy="0 0 0" xyz="0 0 -0.0318"/>
+    </collision>
+
+    <inertial>
+      <mass value="0.006"/>
+      <inertia ixx="0.00044" ixy="0" ixz="0" iyy="2e-05" iyz="0" izz="0.00044"/>
+    </inertial>
+
+  </link>
+
+  <joint name="base_to_front_right_leg" type="revolute">
+    <axis xyz="0 1 0"/>
+    <limit effort="1000.0" lower="-1.57075" upper="1.57075" velocity="0.5"/>
+    <origin rpy="0 0 0" xyz="0.0635 -0.0435 0"/>
+    <parent link="base_link"/>
+    <child link="front_right_upper_leg"/>
+  </joint>
+
+  <link name="front_right_lower_leg">
+    <visual>
+      <geometry>
+        <box size="0.016 0.023 0.065"/>
+      </geometry>
+      <origin rpy="0 0 0" xyz="0 0 -0.0318"/>
+    </visual>
+
+    <collision>
+      <geometry>
+        <box size="0.016 0.023 0.065"/>
+      </geometry>
+      <origin rpy="0 0 0" xyz="0 0 -0.0318"/>
+    </collision>
+
+    <inertial>
+      <mass value="0.017"/>
+      <inertia ixx="6e-05" ixy="-2e-05" ixz="0" iyy="0.00065" iyz="-6e-05" izz="0.00063"/>
+    </inertial>
+
+  </link>
+
+  <joint name="front_right_upper_to_lower_leg" type="revolute">
+    <axis xyz="0 1 0"/>
+    <limit effort="1000.0" lower="-1.57075" upper="1.57075" velocity="0.5"/>
+    <origin rpy="0 0 0" xyz="0 0.008 -0.065"/>
+    <parent link="front_right_upper_leg"/>
+    <child link="front_right_lower_leg"/>
+  </joint>
+
+  <link name="front_right_end_effector">
+    <visual>
+      <geometry>
+         # it's actually 0.0055, but we exagerate for visuals
+         <sphere radius="0.01"/>
+      </geometry>
+      <origin rpy="0 0 0" xyz="0 0 0"/>
+      <material name="blue"/>
+    </visual>
+
+    <collision>
+      <geometry>
+         <sphere radius="0.01"/>
+      </geometry>
+      <origin rpy="0 0 0" xyz="0 0 0"/>
+    </collision>
+
+    <inertial>
+      <mass value="0.005"/>
+      <inertia ixx="6e-05" ixy="-2e-05" ixz="0" iyy="0.00065" iyz="-6e-05" izz="0.00063"/>
+    </inertial>
+
+  </link>
+
+  <joint name="front_right_lower_to_end_effector" type="fixed">
+    <parent link="front_right_lower_leg"/>
+    <child link="front_right_end_effector"/>
+    <origin xyz="0 0 -0.07"/>
+  </joint>
+
+  <link name="back_right_upper_leg">
+    <visual>
+      <geometry>
+        <box size="0.016 0.007 0.065"/>
+      </geometry>
+      <origin rpy="0 0 0" xyz="0 0 -0.0318"/>
+    </visual>
+
+    <collision>
+      <geometry>
+        <box size="0.016 0.007 0.065"/>
+      </geometry>
+      <origin rpy="0 0 0" xyz="0 0 -0.0318"/>
+    </collision>
+
+    <inertial>
+      <mass value="0.006"/>
+      <inertia ixx="0.00044" ixy="0" ixz="0" iyy="2e-05" iyz="0" izz="0.00044"/>
+    </inertial>
+
+  </link>
+
+  <joint name="base_to_back_right_leg" type="revolute">
+    <axis xyz="0 1 0"/>
+    <limit effort="1000.0" lower="-1.57075" upper="1.57075" velocity="0.5"/>
+    <origin rpy="0 0 0" xyz="-0.0635 -0.0435 0"/>
+    <parent link="base_link"/>
+    <child link="back_right_upper_leg"/>
+  </joint>
+
+  <link name="back_right_lower_leg">
+    <visual>
+      <geometry>
+        <box size="0.016 0.023 0.065"/>
+      </geometry>
+      <origin rpy="0 0 0" xyz="0 0 -0.0318"/>
+    </visual>
+
+    <collision>
+      <geometry>
+        <box size="0.016 0.023 0.065"/>
+      </geometry>
+      <origin rpy="0 0 0" xyz="0 0 -0.0318"/>
+    </collision>
+
+    <inertial>
+      <mass value="0.017"/>
+      <inertia ixx="6e-05" ixy="-2e-05" ixz="0" iyy="0.00065" iyz="-6e-05" izz="0.00063"/>
+    </inertial>
+
+  </link>
+
+  <joint name="back_right_upper_to_lower_leg" type="revolute">
+    <axis xyz="0 1 0"/>
+    <limit effort="1000.0" lower="-1.57075" upper="1.57075" velocity="0.5"/>
+    <origin rpy="0 0 0" xyz="0 0.008 -0.065"/>
+    <parent link="back_right_upper_leg"/>
+    <child link="back_right_lower_leg"/>
+  </joint>
+
+  <link name="back_right_end_effector">
+    <visual>
+      <geometry>
+         # it's actually 0.0055, but we exagerate for visuals
+         <sphere radius="0.01"/>
+      </geometry>
+      <origin rpy="0 0 0" xyz="0 0 0"/>
+      <material name="blue"/>
+    </visual>
+
+    <collision>
+      <geometry>
+         <sphere radius="0.01"/>
+      </geometry>
+      <origin rpy="0 0 0" xyz="0 0 0"/>
+    </collision>
+
+    <inertial>
+      <mass value="0.005"/>
+      <inertia ixx="6e-05" ixy="-2e-05" ixz="0" iyy="0.00065" iyz="-6e-05" izz="0.00063"/>
+    </inertial>
+
+  </link>
+
+  <joint name="back_right_lower_to_end_effector" type="fixed">
+    <parent link="back_right_lower_leg"/>
+    <child link="back_right_end_effector"/>
+    <origin xyz="0 0 -0.07"/>
+  </joint>
+
+
+  <link name="front_left_upper_leg">
+    <visual>
+      <geometry>
+        <box size="0.016 0.007 0.065"/>
+      </geometry>
+      <origin rpy="0 0 0" xyz="0 0 -0.0318"/>
+    </visual>
+
+    <collision>
+      <geometry>
+        <box size="0.016 0.007 0.065"/>
+      </geometry>
+      <origin rpy="0 0 0" xyz="0 0 -0.0318"/>
+    </collision>
+
+    <inertial>
+      <mass value="0.006"/>
+      <inertia ixx="0.00044" ixy="0" ixz="0" iyy="2e-05" iyz="0" izz="0.00044"/>
+    </inertial>
+
+  </link>
+
+  <joint name="base_to_front_left_leg" type="revolute">
+    <axis xyz="0 1 0"/>
+    <limit effort="1000.0" lower="-1.57075" upper="1.57075" velocity="0.5"/>
+    <origin rpy="0 0 0" xyz="0.0635 0.0435 0"/>
+    <parent link="base_link"/>
+    <child link="front_left_upper_leg"/>
+  </joint>
+
+  <link name="front_left_lower_leg">
+    <visual>
+      <geometry>
+        <box size="0.016 0.023 0.065"/>
+      </geometry>
+      <origin rpy="0 0 0" xyz="0 0 -0.0318"/>
+    </visual>
+
+    <collision>
+      <geometry>
+        <box size="0.016 0.023 0.065"/>
+      </geometry>
+      <origin rpy="0 0 0" xyz="0 0 -0.0318"/>
+    </collision>
+
+    <inertial>
+      <mass value="0.017"/>
+      <inertia ixx="6e-05" ixy="-2e-05" ixz="0" iyy="0.00065" iyz="-6e-05" izz="0.00063"/>
+    </inertial>
+
+  </link>
+
+  <joint name="front_left_upper_to_lower_leg" type="revolute">
+    <axis xyz="0 1 0"/>
+    <limit effort="1000.0" lower="-1.57075" upper="1.57075" velocity="0.5"/>
+    <origin rpy="0 0 0" xyz="0 -0.008 -0.065"/>
+    <parent link="front_left_upper_leg"/>
+    <child link="front_left_lower_leg"/>
+  </joint>
+
+  <link name="front_left_end_effector">
+    <visual>
+      <geometry>
+         # it's actually 0.0055, but we exagerate for visuals
+         <sphere radius="0.01"/>
+      </geometry>
+      <origin rpy="0 0 0" xyz="0 0 0"/>
+      <material name="blue"/>
+    </visual>
+
+    <collision>
+      <geometry>
+         <sphere radius="0.01"/>
+      </geometry>
+      <origin rpy="0 0 0" xyz="0 0 0"/>
+    </collision>
+
+    <inertial>
+      <mass value="0.005"/>
+      <inertia ixx="6e-05" ixy="-2e-05" ixz="0" iyy="0.00065" iyz="-6e-05" izz="0.00063"/>
+    </inertial>
+
+  </link>
+
+  <joint name="front_left_lower_to_end_effector" type="fixed">
+    <parent link="front_left_lower_leg"/>
+    <child link="front_left_end_effector"/>
+    <origin xyz="0 0 -0.07"/>
+  </joint>
+
+  <link name="back_left_upper_leg">
+    <visual>
+      <geometry>
+        <box size="0.016 0.007 0.065"/>
+      </geometry>
+      <origin rpy="0 0 0" xyz="0 0 -0.0318"/>
+    </visual>
+
+    <collision>
+      <geometry>
+        <box size="0.016 0.007 0.065"/>
+      </geometry>
+      <origin rpy="0 0 0" xyz="0 0 -0.0318"/>
+    </collision>
+
+    <inertial>
+      <mass value="0.006"/>
+      <inertia ixx="0.00044" ixy="0" ixz="0" iyy="2e-05" iyz="0" izz="0.00044"/>
+    </inertial>
+
+  </link>
+
+  <joint name="base_to_back_left_leg" type="revolute">
+    <axis xyz="0 1 0"/>
+    <limit effort="1000.0" lower="-1.57075" upper="1.57075" velocity="0.5"/>
+    <origin rpy="0 0 0" xyz="-0.0635 0.0435 0"/>
+    <parent link="base_link"/>
+    <child link="back_left_upper_leg"/>
+  </joint>
+
+  <link name="back_left_lower_leg">
+    <visual>
+      <geometry>
+        <box size="0.016 0.023 0.065"/>
+      </geometry>
+      <origin rpy="0 0 0" xyz="0 0 -0.0318"/>
+    </visual>
+
+    <collision>
+      <geometry>
+        <box size="0.016 0.023 0.065"/>
+      </geometry>
+      <origin rpy="0 0 0" xyz="0 0 -0.0318"/>
+    </collision>
+
+    <inertial>
+      <mass value="0.017"/>
+      <inertia ixx="6e-05" ixy="-2e-05" ixz="0" iyy="0.00065" iyz="-6e-05" izz="0.00063"/>
+    </inertial>
+
+  </link>
+
+  <joint name="back_left_upper_to_lower_leg" type="revolute">
+    <axis xyz="0 1 0"/>
+    <limit effort="1000.0" lower="-1.57075" upper="1.57075" velocity="0.5"/>
+    <origin rpy="0 0 0" xyz="0 -0.008 -0.065"/>
+    <parent link="back_left_upper_leg"/>
+    <child link="back_left_lower_leg"/>
+  </joint>
+
+  <link name="back_left_end_effector">
+    <visual>
+      <geometry>
+         # it's actually 0.0055, but we exagerate for visuals
+         <sphere radius="0.01"/>
+      </geometry>
+      <origin rpy="0 0 0" xyz="0 0 0"/>
+      <material name="blue"/>
+    </visual>
+
+    <collision>
+      <geometry>
+         <sphere radius="0.01"/>
+      </geometry>
+      <origin rpy="0 0 0" xyz="0 0 0"/>
+    </collision>
+
+    <inertial>
+      <mass value="0.005"/>
+      <inertia ixx="6e-05" ixy="-2e-05" ixz="0" iyy="0.00065" iyz="-6e-05" izz="0.00063"/>
+    </inertial>
+
+  </link>
+
+  <joint name="back_left_lower_to_end_effector" type="fixed">
+    <parent link="back_left_lower_leg"/>
+    <child link="back_left_end_effector"/>
+    <origin xyz="0 0 -0.07"/>
+  </joint>
+
+
+
+</robot>

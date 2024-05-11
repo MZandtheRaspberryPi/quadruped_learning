@@ -1,0 +1,4 @@
+jax[cuda12]==0.4.28
+numpy
+pybullet>=3.0.6
+tqdm
