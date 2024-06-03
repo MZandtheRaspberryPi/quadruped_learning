@@ -7,7 +7,7 @@ from numpy.typing import NDArray
 import numpy as np
 import pybullet
 
-from motor import Motor
+from motor import Motor, MAX_ABS_TORQUE
 from sim_config_bittle import (INIT_POS, INIT_ROT, URDF_FILENAME,
                                LOWER_MOTOR_LIMIT, UPPER_MOTOR_LIMIT,
                                SIM_MOTOR_IDS, MOTOR_DIRECTIONS, MOTOR_OFFSETS,
@@ -43,7 +43,7 @@ DEFAULT_ROBOT_POSE = Pose(INIT_POS, INIT_ROT, DEFAULT_MOTOR_ANGLES)
 class Robot:
     def __init__(self, pybullet_client, noisy: bool = False, sim_motor_ids: List[int] = SIM_MOTOR_IDS,
                  init_pos=INIT_POS, init_rot=INIT_ROT, lower_motor_limit: float = LOWER_MOTOR_LIMIT,
-                 upper_motor_limit: float = UPPER_MOTOR_LIMIT, clip_motor_commands: bool = True,
+                 upper_motor_limit: float = UPPER_MOTOR_LIMIT, clip_motor_commands: bool = False,
                  time_step: float = 0.001, motor_directions: Tuple[int] = MOTOR_DIRECTIONS, motor_offsets: Tuple[int] = MOTOR_OFFSETS,
                  urdf_file_name: str = URDF_FILENAME, action_repeat: int = 33, default_pose: Pose = DEFAULT_ROBOT_POSE, render: bool = False):
         self._pybullet_client = pybullet_client
@@ -196,21 +196,28 @@ class Robot:
             motor_commands = np.where(
                 motor_commands < self.lower_motor_limit, self.lower_motor_limit_arr, motor_commands)
 
-        self.last_action_time = self.state_action_counter * self.time_step
+        # self.last_action_time = self.state_action_counter * self.time_step
 
-        motor_angles = observation.motor_angles
+        # motor_angles = observation.motor_angles
 
-        motor_velocities = observation.motor_velocities
+        # motor_velocities = observation.motor_velocities
 
-        torque_to_command = self.motor_controller.convert_motor_command_to_torque(motor_commands, motor_angles,
-                                                                                  motor_velocities)
-        applied_motor_torque = np.multiply(
-            torque_to_command, self.motor_directions)
+        # torque_to_command = self.motor_controller.convert_motor_command_to_torque(motor_commands, motor_angles,
+        #                                                                           motor_velocities)
+        # applied_motor_torque = np.multiply(
+        #     torque_to_command, self.motor_directions)
+        # self._pybullet_client.setJointMotorControlArray(
+        #     bodyIndex=self.quadruped,
+        #     jointIndices=self.motor_ids,
+        #     controlMode=self._pybullet_client.TORQUE_CONTROL,
+        #     forces=applied_motor_torque)
         self._pybullet_client.setJointMotorControlArray(
-            bodyIndex=self.quadruped,
-            jointIndices=self.motor_ids,
-            controlMode=self._pybullet_client.TORQUE_CONTROL,
-            forces=applied_motor_torque)
+                self.quadruped,
+                SIM_MOTOR_IDS,
+                self._pybullet_client.POSITION_CONTROL,
+                motor_commands,
+                forces=[MAX_ABS_TORQUE]*len(motor_commands),
+        )
 
     def step(self, motor_commands: "np.array", previous_observation: Observation):
         new_observation = previous_observation

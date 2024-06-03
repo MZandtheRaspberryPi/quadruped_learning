@@ -18,7 +18,7 @@ GROUND_URDF_FILENAME = "plane_implicit.urdf"
 @dataclass
 class SimParams:
     """params for the pybullet sim"""
-    sim_time_step: float = 0.001
+    sim_time_step: float = 0.005
     num_action_repeat: int = 33
     enable_hard_reset: bool = False
     enable_rendering: bool = False
@@ -61,9 +61,12 @@ class SimEnv:
         if self.render_flag:
             self._pybullet_client = bullet_client.BulletClient(
                 connection_mode=pybullet.GUI)
-            pybullet.configureDebugVisualizer(
-                pybullet.COV_ENABLE_GUI,
+            self._pybullet_client.configureDebugVisualizer(
+                pybullet.COV_ENABLE_RENDERING,
                 self.config.enable_rendering_gui)
+            self._pybullet_client.configureDebugVisualizer(
+                pybullet.COV_ENABLE_SINGLE_STEP_RENDERING,
+                1)
             # should we add a parameter to show reference?
         else:
             self._pybullet_client = bullet_client.BulletClient(
@@ -144,7 +147,10 @@ class SimEnv:
 
         if self.render_flag:
             self._pybullet_client.configureDebugVisualizer(
-                self._pybullet_client.COV_ENABLE_RENDERING, 0)
+                self._pybullet_client.COV_ENABLE_RENDERING, self.config.enable_rendering_gui)
+            self._pybullet_client.configureDebugVisualizer(
+                pybullet.COV_ENABLE_SINGLE_STEP_RENDERING,
+                1)
 
         # Clear the simulation world and rebuild the robot interface.
         self._pybullet_client.resetSimulation()
@@ -166,7 +172,10 @@ class SimEnv:
 
         if self.render_flag:
             self._pybullet_client.configureDebugVisualizer(
-                self._pybullet_client.COV_ENABLE_RENDERING, 1)
+                self._pybullet_client.COV_ENABLE_RENDERING, self.config.enable_rendering_gui)
+            self._pybullet_client.configureDebugVisualizer(
+                pybullet.COV_ENABLE_SINGLE_STEP_RENDERING,
+                1)
         # Rebuild the robot
         self._robot = Robot(self._pybullet_client, action_repeat=1)
         self._robot.reset()
@@ -275,14 +284,14 @@ def build_env(reference_motions: List[NDArray],
     return env
 
 
-def test_pid_controller(tol: float = 0.05):
-    motion_files = ["/home/mz/quadruped_learning/trot.txt"]
+def test_pid_controller(tol: float = 0.1):
+    motion_files = ["/home/mz/quadruped_learning/data_retargetted_motion/pace.txt"]
     list_of_motion_frames = load_ref_motions(motion_files)
     env = build_env(list_of_motion_frames, enable_rendering=True,
                     show_reference_motion=True)
 
     for i in range(len(DEFAULT_MOTOR_ANGLES)):
-
+        print(f"commanding {i} motor")
         motor_angles = np.copy(DEFAULT_MOTOR_ANGLES)
         motor_angles[i] += np.pi / 4
 
@@ -295,6 +304,7 @@ def test_pid_controller(tol: float = 0.05):
 
         while True:
             diffs = np.abs(motor_angles - previous_observation.motor_angles)
+            print(diffs)
             if all(diffs < tol):
                 env.reset()
                 break
@@ -304,7 +314,7 @@ def test_pid_controller(tol: float = 0.05):
 
 
 def test_env():
-    motion_files = ["/home/mz/quadruped_learning/trot.txt"]
+    motion_files = ["/home/mz/quadruped_learning/data_retargetted_motion/trot.txt"]
     list_of_motion_frames = load_ref_motions(motion_files)
     env = build_env(list_of_motion_frames, enable_rendering=True,
                     show_reference_motion=True)

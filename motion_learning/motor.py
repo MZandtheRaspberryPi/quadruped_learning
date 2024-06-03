@@ -7,10 +7,10 @@ from numpy.typing import NDArray
 import numpy as np
 
 NUM_MOTORS = 8
-MAX_ABS_TORQUE = 0.4
+MAX_ABS_TORQUE = 0.3
 TORQUE_LIMITS = np.asarray([MAX_ABS_TORQUE] * NUM_MOTORS)
 DEFAULT_KP = 0.8
-DEFAULT_KD = 0.3
+DEFAULT_KD = 0.05
 
 
 class Motor:
@@ -29,7 +29,7 @@ class Motor:
         desired_motor_angles = motor_command
         desired_motor_velocities = np.full(NUM_MOTORS, 0)
 
-        motor_torques = -1 * (kp * (motor_angles - desired_motor_angles)) - 0 * kd * (
+        motor_torques = -1 * (kp * (motor_angles - desired_motor_angles)) - kd * (
             motor_velocities - desired_motor_velocities) + additional_torques
         motor_torques = self.strength_ratios * motor_torques
         if self.torque_limits is not None:

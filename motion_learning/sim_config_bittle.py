@@ -4,7 +4,7 @@ import numpy as np
 from pybullet_utils import transformations
 
 URDF_FILENAME = os.path.join(os.path.dirname(
-    __file__), "bittle", "bittle_simple.urdf")
+    __file__), "..", "bittle", "bittle_petoi.urdf")
 
 REF_POS_SCALE = 1
 # INIT_POS = np.array([0, 0, 0.15])
@@ -12,37 +12,8 @@ INIT_POS = np.array([0, 0, 0.2])
 INIT_ROT = transformations.quaternion_from_euler(
     ai=0, aj=0, ak=0, axes="sxyz")
 
-DEFAULT_JOINT_POSE = np.array(
-    [0.7853145, -0.7853145, 0.7853145, -0.7853145, 0.7853145, -0.7853145, 0.7853145, -0.7853145, 0, 0, 0, 0])
 DEFAULT_MOTOR_ANGLES = np.array(
-    [0.7853145, -0.7853145, 0.7853145, -0.7853145, 0.7853145, -0.7853145, 0.7853145, -0.7853145])
-
-FRONT_LEFT_HIP_ID = 6
-FRONT_LEFT_KNEE_ID = 7
-FRONT_LEFT_END_EFFECTOR_ID = 8
-BACK_LEFT_HIP_ID = 9
-BACK_LEFT_KNEE_ID = 10
-BACK_LEFT_END_EFFECTOR_ID = 11
-FRONT_RIGHT_HIP_ID = 0
-FRONT_RIGHT_KNEE_ID = 1
-FRONT_RIGHT_END_EFFECTOR_ID = 2
-BACK_RIGHT_HIP_ID = 3
-BACK_RIGHT_KNEE_ID = 4
-BACK_RIGHT_END_EFFECTOR_ID = 5
-
-SIM_MOTOR_IDS = [FRONT_LEFT_HIP_ID, FRONT_LEFT_KNEE_ID,
-                 BACK_LEFT_HIP_ID, BACK_LEFT_KNEE_ID, FRONT_RIGHT_HIP_ID, FRONT_RIGHT_KNEE_ID,
-                 BACK_RIGHT_HIP_ID, BACK_RIGHT_KNEE_ID]
-# front left hip, front left knee, front left end effector, back left hip, back left knee, back left end effector
-# front right hip, front right knee, front right end effector, back right hip, back right knee, back right end effector
-SIM_JOINT_IDS = [6, 7, 8, 9, 10, 11, 0, 1, 2, 3, 4, 5]
-
-LOWER_MOTOR_LIMIT = -np.pi/2
-UPPER_MOTOR_LIMIT = np.pi/2
-
-MOTOR_DIRECTIONS = (1, 1, 1, 1, 1, 1, 1, 1)
-MOTOR_OFFSETS = (0, 0, 0, 0, 0, 0, 0, 0)
-
+    [0, 0, 0, 0, 0, 0, 0, 0], dtype=np.float32)
 """
 PETOI_URDF
 
@@ -69,6 +40,8 @@ BACK_RIGHT_END_EFFECTOR_ID = 24
 SIM_MOTOR_IDS = [FRONT_LEFT_HIP_ID, FRONT_LEFT_KNEE_ID,
                  BACK_LEFT_HIP_ID, BACK_LEFT_KNEE_ID, FRONT_RIGHT_HIP_ID, FRONT_RIGHT_KNEE_ID,
                  BACK_RIGHT_HIP_ID, BACK_RIGHT_KNEE_ID]
-# front left hip, front left knee, front left end effector, back left hip, back left knee, back left end effector
-# front right hip, front right knee, front right end effector, back right hip, back right knee, back right end effector
-SIM_JOINT_IDS = [6, 7, 8, 9, 10, 11, 0, 1, 2, 3, 4, 5]
+LOWER_MOTOR_LIMIT = -np.pi/2
+UPPER_MOTOR_LIMIT = np.pi/2
+
+MOTOR_DIRECTIONS = (1, 1, 1, 1, 1, 1, 1, 1)
+MOTOR_OFFSETS = (0, 0, 0, 0, 0, 0, 0, 0)

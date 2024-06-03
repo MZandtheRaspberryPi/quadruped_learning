@@ -4,9 +4,10 @@ from typing import List
 from numpy.typing import NDArray
 import numpy as np
 
-from retarget_config_bittle import POS_SIZE, ROT_SIZE
 from util import quat_norm, standardize_quat
 
+POS_SIZE = 3
+ROT_SIZE = 4
 
 LOOP_MODE_KEY = "LoopMode"
 FRAME_DURATION_KEY = "FrameDuration"
