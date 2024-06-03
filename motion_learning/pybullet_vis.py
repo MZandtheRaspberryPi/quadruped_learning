@@ -1,7 +1,7 @@
 import time
-
+import os
 import sys
-sys.path.append("/home/mz/quadruped_learning")
+sys.path.append(os.path.dirname(__file__))
 
 import numpy as np
 import pybullet
