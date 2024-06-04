@@ -13,7 +13,7 @@ INIT_ROT = transformations.quaternion_from_euler(
     ai=0, aj=0, ak=0, axes="sxyz")
 
 DEFAULT_MOTOR_ANGLES = np.array(
-    [0, 0, 0, 0, 0, 0, 0, 0], dtype=np.float32)
+    [-0.7853145, 0.7853145, 0.7853145, 0.7853145, -0.7853145, 0.7853145, 0.7853145, 0.7853145], dtype=np.float32)
 """
 PETOI_URDF
 

@@ -12,6 +12,7 @@ from sim_config_bittle import (INIT_POS, INIT_ROT, URDF_FILENAME,
                                LOWER_MOTOR_LIMIT, UPPER_MOTOR_LIMIT,
                                SIM_MOTOR_IDS, MOTOR_DIRECTIONS, MOTOR_OFFSETS,
                                DEFAULT_MOTOR_ANGLES)
+from util import euler_from_quaternion
 
 
 class MotorControlMode(Enum):
@@ -26,8 +27,11 @@ ROT_SIZE = 4
 class Observation:
     base_position: NDArray
     base_orientation: NDArray
+    base_orientation_euler: NDArray
+    base_angular_velocity: NDArray
     motor_angles: NDArray
     motor_velocities: NDArray
+    is_safe: bool
 
 
 @dataclass
@@ -38,6 +42,13 @@ class Pose:
 
 
 DEFAULT_ROBOT_POSE = Pose(INIT_POS, INIT_ROT, DEFAULT_MOTOR_ANGLES)
+
+def check_if_safe(roll, pitch, safe_angle_limit: float = np.pi/4):
+    safe = True
+    safe &= abs(pitch) < abs(safe_angle_limit)
+    safe &= abs(roll) < abs(safe_angle_limit)
+    return safe
+    
 
 
 class Robot:
@@ -79,7 +90,6 @@ class Robot:
 
         self.default_pose = default_pose
 
-        self.is_safe = True
         self.action_repeat = action_repeat
         self.joint_name_to_id = {}
 
@@ -147,6 +157,29 @@ class Robot:
         #                                                 pybullet.VELOCITY_CONTROL,
         #                                                 forces=np.zeros((len(self.motor_ids))))
 
+    def transform_angular_velocity_to_local_frame(self, angular_velocity,
+                                            orientation):
+        """Transform the angular velocity from world frame to robot's frame.
+
+        Args:
+            angular_velocity: Angular velocity of the robot in world frame.
+            orientation: Orientation of the robot represented as a quaternion.
+
+        Returns:
+            angular velocity based on the given orientation.
+        """
+        # Treat angular velocity as a position vector, then transform based on the
+        # orientation given by dividing (or multiplying with inverse).
+        # Get inverse quaternion assuming the vector is at 0,0,0 origin.
+        _, orientation_inversed = self._pybullet_client.invertTransform(
+            [0, 0, 0], orientation)
+        # Transform the angular_velocity at neutral orientation using a neutral
+        # translation and reverse of the given orientation.
+        relative_velocity, _ = self._pybullet_client.multiplyTransforms(
+            [0, 0, 0], orientation_inversed, angular_velocity,
+            self._pybullet_client.getQuaternionFromEuler([0, 0, 0]))
+        return np.asarray(relative_velocity)
+
     def get_observation(self) -> Observation:
         """returns the observations including orientation (4d quaternion), and joint angles in the order specified by joint_ids
         """
@@ -164,6 +197,9 @@ class Robot:
             orientationA=orientation,
             positionB=[0, 0, 0],
             orientationB=self.init_orientation_inv)
+        base_angular_velocity = self._pybullet_client.getBaseVelocity(self.quadruped)[1]
+        base_angular_velocity = self.transform_angular_velocity_to_local_frame(base_angular_velocity,
+                                                 base_orientation)
 
         motor_angles = [state[0] for state in joint_states]
         motor_angles = np.multiply(np.asarray(
@@ -179,13 +215,11 @@ class Robot:
         # motor_commands, q, qdot, qdot_true, control_mode)
         # observation.extend(self.GetTrueBaseOrientation())
         # observation.extend(self.GetTrueBaseRollPitchYawRate())
-
-    #     angular_velocity = self._pybullet_client.getBaseVelocity(self.quadruped)[1]
-    # orientation = self.GetTrueBaseOrientation()
-    # return self.TransformAngularVelocityToLocalFrame(angular_velocity,
-    #                                                  orientation)
-        obs = Observation(base_position, base_orientation,
-                          motor_angles, motor_velocities)
+        roll, pitch, yaw = euler_from_quaternion(base_orientation[0], base_orientation[1],
+                                                 base_orientation[2], base_orientation[3])
+        is_safe = check_if_safe(roll, pitch, np.pi/4)
+        obs = Observation(base_position, base_orientation, np.array([roll, pitch, yaw]), base_angular_velocity,
+                          motor_angles, motor_velocities, is_safe)
         return obs
 
     def apply_action(self, motor_commands: NDArray, observation: Observation):
@@ -236,6 +270,3 @@ class Robot:
             joint_info = self._pybullet_client.getJointInfo(self.quadruped, i)
             self.joint_name_to_id[joint_info[1].decode(
                 "UTF-8")] = joint_info[0]
-
-    def terminate(self):
-        pass

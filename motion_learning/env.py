@@ -84,6 +84,9 @@ class SimEnv:
         self.last_frame_time = time.time()
         self.reset()
 
+    def get_sim_timestep(self):
+        return self.config.sim_time_step
+
     def show_reference_model(self):
         self.reference_quadruped = self._pybullet_client.loadURDF(
             URDF_FILENAME, INIT_POS, INIT_ROT, useFixedBase=True)
@@ -189,14 +192,6 @@ class SimEnv:
     def get_observation(self):
         return self._robot.get_observation()
 
-    def termination(self):
-        if not self._robot.is_safe:
-            return True
-
-        # check if we are done wtih reference motion
-
-        return False
-
     def step(self, action: "np.array", previous_observation: Observation):
         if self.render_flag:
             # Sleep, otherwise the computation takes less time than real time,
@@ -244,12 +239,8 @@ class SimEnv:
         #     self._task.update(self)
 
         # reward = self._reward()
-        reward = 0
-        done = self.termination()
         self.env_step_counter += 1
-        if done:
-            self._robot.terminate()
-        return new_observation, reward, done, {}
+        return new_observation
 
     def play_motion_files_with_movements(self, repeats_per_file: int = 3):
         for frames in self.reference_motions:
@@ -314,14 +305,14 @@ def test_pid_controller(tol: float = 0.1):
 
 
 def test_env():
-    motion_files = ["/home/mz/quadruped_learning/data_retargetted_motion/trot.txt"]
+    motion_files = ["/home/mz/quadruped_learning/data_retargetted_motion/pace.txt"]
     list_of_motion_frames = load_ref_motions(motion_files)
     env = build_env(list_of_motion_frames, enable_rendering=True,
                     show_reference_motion=True)
 
-    env.play_motion_files_with_movements(repeats_per_file=3)
+    env.play_motion_files_with_movements(repeats_per_file=1)
 
 
 if __name__ == "__main__":
-    # test_env()
-    test_pid_controller()
+    test_env()
+    # test_pid_controller()

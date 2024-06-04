@@ -17,7 +17,7 @@ INIT_ROT = transformations.quaternion_from_euler(
 # DEFAULT_JOINT_POSE = np.array(
 #     [0.7853145, -0.7853145, 0.7853145, -0.7853145, 0.7853145, -0.7853145, 0.7853145, -0.7853145, 0, 0, 0, 0])
 DEFAULT_JOINT_POSE = np.array(
-    [0.7853145, -0.7853145, 0.7853145, -0.7853145, 0.7853145, -0.7853145, 0.7853145, -0.7853145])
+    [-0.7853145, 0.7853145, 0.7853145, 0.7853145, -0.7853145, 0.7853145, 0.7853145, 0.7853145])
 
 POS_SIZE = 3
 ROT_SIZE = 4
@@ -108,10 +108,10 @@ def main():
     # set_pose(robot, np.concatenate(
     #     [INIT_POS, INIT_ROT, DEFAULT_JOINT_POSE]))
 
-    # pybullet.setJointMotorControlArray(robot,
-    #                                    SIM_MOTOR_IDS,
-    #                                    pybullet.POSITION_CONTROL,
-    #                                    DEFAULT_JOINT_POSE)
+    pybullet.setJointMotorControlArray(robot,
+                                       SIM_MOTOR_IDS,
+                                       pybullet.POSITION_CONTROL,
+                                       DEFAULT_JOINT_POSE)
     # for j_idx in range(len(SIM_MOTOR_IDS)):
     #     j_id = SIM_MOTOR_IDS[j_idx]
     #     j_angle = DEFAULT_JOINT_POSE[j_idx]
