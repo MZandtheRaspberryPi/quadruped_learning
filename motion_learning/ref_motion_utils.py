@@ -105,7 +105,8 @@ def load_motion_file(filename: str, sim_timestep: float = 0.005,
     motion_total_time = num_frames * frame_duration
     num_timesteps_in_traj = motion_total_time / sim_timestep
     simsteps_per_frame = num_timesteps_in_traj // num_frames
-    return expand_frames(frames, int(simsteps_per_frame))
+    # return expand_frames(frames, int(simsteps_per_frame))
+    return frames
 
 
 def load_ref_motions(filenames: List[str]):

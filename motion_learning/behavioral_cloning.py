@@ -231,7 +231,8 @@ def test_scenario(motions_and_ids: Dict[int, str],
     for i in range(len(phases) - 1):
         
         motor_angles = predict(params, cur_state)
-        true_motor_angles = states[i, 1 + 1 + len(observation.base_orientation_euler) + len(observation.base_angular_velocity):]
+        # true_motor_angles = states[i, 1 + 1 + len(observation.base_orientation_euler) + len(observation.base_angular_velocity):]
+        true_motor_angles = expert_trajectory[i, POS_SIZE + ROT_SIZE:]
         pos = INIT_POS
         rot = INIT_ROT
         pose = Pose(pos, rot, true_motor_angles)
@@ -258,5 +259,5 @@ if __name__ == "__main__":
         train(motion_files_ids)
     example_test = True
     if example_test:
-       test_scenario(motion_files_ids, motion_id=0)
+       test_scenario(motion_files_ids, motion_id=4)
 
