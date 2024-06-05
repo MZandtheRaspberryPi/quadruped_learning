@@ -7,9 +7,9 @@ from ref_motion_utils import load_ref_motions
 
 
 def main():
-    motion_files = ["trot.txt"]
-    file_dir = "/home/mz/quadruped_learning"
-    list_of_motion_frames = load_ref_motions(motion_files)
+    file_dir = "/home/mz/quadruped_learning/"
+    file_name = "pace.txt"
+    motion_files = [file_name]
     num_motors = 8
     num_end_effectors = 4
     pos_size = 3
@@ -28,7 +28,9 @@ def main():
         for i in range(num_motors):
             motor_col_idx = pos_size + orientation_size + i
             axes[i].plot(time_steps, frames[:, motor_col_idx])
-            # axes[i].set_ylabel(f"{i}")
+            axes[i].set_ylabel(f"{i}")
+        fig.text(0.5, 0.04, 'timestep', ha='center')
+        fig.text(0.01, 0.5, 'angle (rads)', va='center', rotation='vertical')
         plt.show()
 
 

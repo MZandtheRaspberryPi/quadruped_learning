@@ -36,7 +36,7 @@ class SimParams:
     enable_rendering: bool = False
     enable_rendering_gui: bool = True
     robot_on_track: bool = False
-    camera_distance: float = 1.0
+    camera_distance: float = 0.5
     camera_yaw: float = 0
     camera_pitch: float = -30
     render_width: int = 480
@@ -159,63 +159,88 @@ class SimEnv:
         return self.config.sim_time_step
 
     def show_reference_model(self):
-        self.reference_quadruped = self._pybullet_client.loadURDF(
-            URDF_FILENAME, INIT_POS, INIT_ROT, useFixedBase=True)
-        alpha = 0.5
-        ref_col = [1, 1, 1, alpha]
+        # self.reference_quadruped = self._pybullet_client.loadURDF(
+        #     URDF_FILENAME, INIT_POS, INIT_ROT) # , useFixedBase=True
+        # self._pybullet_client.resetBasePositionAndOrientation(
+        #     self.reference_quadruped, [0, 0, 0],
+        #     [0, 0, 0, 1])
+        # self._pybullet_client.resetBaseVelocity(self.reference_quadruped, [0, 0, 0],
+        #                                         [0, 0, 0])
+        # alpha = 0.5
+        # ref_col = [1, 1, 1, alpha]
 
-        self._pybullet_client.changeDynamics(
-            self.reference_quadruped, -1, linearDamping=0, angularDamping=0)
+        # self._pybullet_client.changeDynamics(
+        #     self.reference_quadruped, -1, linearDamping=0, angularDamping=0)
 
-        self._pybullet_client.setCollisionFilterGroupMask(
-            self.reference_quadruped, -1, collisionFilterGroup=0, collisionFilterMask=0)
+        # self._pybullet_client.setCollisionFilterGroupMask(
+        #     self.reference_quadruped, -1, collisionFilterGroup=0, collisionFilterMask=0)
 
-        self._pybullet_client.changeDynamics(
-            self.reference_quadruped,
-            -1,
-            activationState=self._pybullet_client.ACTIVATION_STATE_SLEEP +
-            self._pybullet_client.ACTIVATION_STATE_ENABLE_SLEEPING +
-            self._pybullet_client.ACTIVATION_STATE_DISABLE_WAKEUP)
+        # self._pybullet_client.changeDynamics(
+        #     self.reference_quadruped,
+        #     -1,
+        #     activationState=self._pybullet_client.ACTIVATION_STATE_SLEEP +
+        #     self._pybullet_client.ACTIVATION_STATE_ENABLE_SLEEPING +
+        #     self._pybullet_client.ACTIVATION_STATE_DISABLE_WAKEUP)
 
-        self._pybullet_client.changeVisualShape(
-            self.reference_quadruped, -1, rgbaColor=ref_col)
+        # self._pybullet_client.changeVisualShape(
+        #     self.reference_quadruped, -1, rgbaColor=ref_col)
 
-        num_joints = self._pybullet_client.getNumJoints(
-            self.reference_quadruped)
+        # num_joints = self._pybullet_client.getNumJoints(
+        #     self.reference_quadruped)
+        
+        # self._pybullet_client.resetBaseVelocity(self.reference_quadruped, [0, 0, 0],
+        #                                         [0, 0, 0])
 
-        for j in range(num_joints):
-            self._pybullet_client.setCollisionFilterGroupMask(
-                self.reference_quadruped, j, collisionFilterGroup=0, collisionFilterMask=0)
+        # # remove joint dampening
+        # num_joints = self._pybullet_client.getNumJoints(self.reference_quadruped)
+        # for i in range(num_joints):
+        #     joint_info = self._pybullet_client.getJointInfo(self.reference_quadruped, i)
+        #     self._pybullet_client.changeDynamics(joint_info[0],
+        #                                          -1,
+        #                                          linearDamping=0,
+        #                                          angularDamping=0)
 
-            self._pybullet_client.changeDynamics(
-                self.reference_quadruped,
-                j,
-                activationState=self._pybullet_client.ACTIVATION_STATE_SLEEP +
-                self._pybullet_client.ACTIVATION_STATE_ENABLE_SLEEPING +
-                self._pybullet_client.ACTIVATION_STATE_DISABLE_WAKEUP)
+        # # this seems important, perhaps there's a default motor controller in pybullet
+        # for joint_index in SIM_MOTOR_IDS:
+        #     self._pybullet_client.setJointMotorControl2(
+        #         bodyIndex=self.reference_quadruped,
+        #         jointIndex=joint_index,
+        #         controlMode=self._pybullet_client.VELOCITY_CONTROL,
+        #         targetVelocity=0,
+        #         force=0)
 
-            self._pybullet_client.changeVisualShape(
-                self.reference_quadruped, j, rgbaColor=ref_col)
+        # for j in range(num_joints):
+        #     self._pybullet_client.setCollisionFilterGroupMask(
+        #         self.reference_quadruped, j, collisionFilterGroup=0, collisionFilterMask=0)
+
+        #     self._pybullet_client.changeDynamics(
+        #         self.reference_quadruped,
+        #         j,
+        #         activationState=self._pybullet_client.ACTIVATION_STATE_SLEEP +
+        #         self._pybullet_client.ACTIVATION_STATE_ENABLE_SLEEPING +
+        #         self._pybullet_client.ACTIVATION_STATE_DISABLE_WAKEUP)
+
+        #     self._pybullet_client.changeVisualShape(
+        #         self.reference_quadruped, j, rgbaColor=ref_col)
+        init_pos = np.copy(INIT_POS)
+        init_pos[1] = -0.3
+        init_pos[2] += 0.3
+        self._ref_robot = Robot(self._pybullet_client, action_repeat=1, init_pos=init_pos)
+        self._ref_robot.reset()
+            
+    def set_pose(self, robot, pose):
+        self._pybullet_client.resetBasePositionAndOrientation(robot, pose[:POS_SIZE], pose[POS_SIZE:POS_SIZE+ROT_SIZE])
+        angles = pose[POS_SIZE + ROT_SIZE:]
+        for i in range(len(angles)):
+            j_id = SIM_MOTOR_IDS[i]
+            angle = angles[i]
+            self._pybullet_client.resetJointStateMultiDof(robot, j_id, [angle], np.zeros((1,)))
+        return
 
     def set_ref_model_pose(self, pose: Pose):
-        self._pybullet_client.resetBasePositionAndOrientation(self.reference_quadruped,
-                                                              pose.root_position,
-                                                              pose.root_orientation)
-        for j in range(len(pose.joint_angles)):
-            joint_index = SIM_MOTOR_IDS[j]
-            joint_target_angle = pose.joint_angles[j]
-            j_info = self._pybullet_client.getJointInfo(
-                self.reference_quadruped, joint_index)
-            j_state = self._pybullet_client.getJointStateMultiDof(
-                self.reference_quadruped, joint_index)
-            j_pose_size = len(j_state[0])
-            j_vel_size = len(j_state[1])
-
-            if (j_pose_size > 0):
-                j_pose = np.array([joint_target_angle])
-                j_vel = np.zeros(j_vel_size)
-                self._pybullet_client.resetJointStateMultiDof(
-                    self.reference_quadruped, joint_index, j_pose, j_vel)
+        full_pose = np.hstack([pose.root_position, pose.root_orientation, pose.joint_angles])
+        self.set_pose(self._ref_robot.quadruped, full_pose)
+        self.update_camera_and_sleep()
                 
 
     def reset_me(self):
@@ -343,7 +368,11 @@ class SimEnv:
                 previous_observation = self.reset_me()
                 for i in range(frames.shape[0]):
                     frame = frames[i]
+                    other_frame = np.array([ 0.        ,  0.        ,  0.43701   , -0.00543505,  0.04502121,
+        0.04979647,  0.99772935, -1.08372851,  2.47486496,  0.62891553,
+        1.71533483, -1.42093884,  2.89259569,  1.0858994 ,  2.43892924])
                     pos = frame[:POS_SIZE]
+                    pos[2] += 0.4
                     rot = frame[POS_SIZE:POS_SIZE + ROT_SIZE]
                     actions = frame[POS_SIZE + ROT_SIZE:]
                     pose = Pose(pos, rot, actions)
@@ -403,11 +432,11 @@ def test_pid_controller(tol: float = 0.1):
 
 def test_env():
     motion_files = ["/home/mz/quadruped_learning/data_retargetted_motion/pace.txt"]
-    list_of_motion_frames = load_ref_motions(motion_files)
+    list_of_motion_frames = load_ref_motions(motion_files, frame_duration_override=0.01)
     env = build_env(list_of_motion_frames, enable_rendering=True,
                     show_reference_motion=True)
 
-    env.play_motion_files_with_movements(repeats_per_file=1)
+    env.play_motion_files_with_movements(repeats_per_file=5)
 
 
 if __name__ == "__main__":

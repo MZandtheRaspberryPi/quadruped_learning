@@ -134,9 +134,10 @@ def update(params, states, actions):
 def train(motion_files_ids: Dict[int, str],
           seed: Union[int, None] = None,
           cache_dir: str = "/home/mz/quadruped_learning/motion_learning/bc_cache",
-          sim_timestep: float = 0.005) -> List[Tuple[ArrayLike]]:
+          sim_timestep: float = 0.005,
+          frame_duration_override: float = 0.1 ) -> List[Tuple[ArrayLike]]:
     os.makedirs(cache_dir, exist_ok=True)
-    num_epochs = 1000
+    num_epochs = 3000
     batch_size = 200
     if seed is None:
         seed = 1
@@ -148,7 +149,7 @@ def train(motion_files_ids: Dict[int, str],
 
     for motion_id, file_path in motion_files_ids.items():
 
-        expert_trajectory = load_motion_file(file_path, sim_timestep=sim_timestep, frame_duration_override=0.04)
+        expert_trajectory = load_motion_file(file_path, sim_timestep=sim_timestep, frame_duration_override=frame_duration_override)
         states, actions = expert_trajectory_to_states_actions(expert_trajectory=expert_trajectory,
                                                                   trajectory_movement_id=motion_id, num_repeats=1,
                                                                     sim_timestep=sim_timestep)
@@ -205,9 +206,11 @@ def train(motion_files_ids: Dict[int, str],
 def test_scenario(motions_and_ids: Dict[int, str],
                   motion_id: int,
                   cache_dir: str = "/home/mz/quadruped_learning/motion_learning/bc_cache",
-                  sim_timestep: float = 0.005):
+                  sim_timestep: float = 0.005,
+                  num_loops: int = 10,
+                  frame_duration_override: float = 0.1 ):
     file_path = motions_and_ids[motion_id]
-    expert_trajectory = load_motion_file(file_path, sim_timestep=sim_timestep, frame_duration_override=0.04)
+    expert_trajectory = load_motion_file(file_path, sim_timestep=sim_timestep, frame_duration_override=frame_duration_override)
     states, actions = expert_trajectory_to_states_actions(expert_trajectory=expert_trajectory,
                                                                   trajectory_movement_id=motion_id, num_repeats=1,
                                                                     sim_timestep=sim_timestep)
@@ -224,23 +227,24 @@ def test_scenario(motions_and_ids: Dict[int, str],
         params.append((jnp.array(weights_arr), jnp.array(bias_arr)))
     env = build_env(reference_motions=[expert_trajectory],
               enable_rendering=True, show_reference_motion=True, sim_time_step=sim_timestep)
-    env.reset()
-    observation = env.get_observation()
-    phases = states[:, 0]
-    cur_state = observation_to_state(observation, motion_id, phases[0])
-    for i in range(len(phases) - 1):
-        
-        motor_angles = predict(params, cur_state)
-        # true_motor_angles = states[i, 1 + 1 + len(observation.base_orientation_euler) + len(observation.base_angular_velocity):]
-        true_motor_angles = expert_trajectory[i, POS_SIZE + ROT_SIZE:]
-        pos = INIT_POS
-        rot = INIT_ROT
-        pose = Pose(pos, rot, true_motor_angles)
-        env.set_ref_model_pose(pose)
+    for _ in range(num_loops):
+        env.reset_me()
+        observation = env.get_observation()
+        phases = states[:, 0]
+        cur_state = observation_to_state(observation, motion_id, phases[0])
+        for i in range(len(phases) - 1):
+            
+            motor_angles = predict(params, cur_state)
+            # true_motor_angles = states[i, 1 + 1 + len(observation.base_orientation_euler) + len(observation.base_angular_velocity):]
+            true_motor_angles = expert_trajectory[i, POS_SIZE + ROT_SIZE:]
+            pos = INIT_POS
+            rot = INIT_ROT
+            pose = Pose(pos, rot, true_motor_angles)
+            env.set_ref_model_pose(pose)
 
-        observation = env.step_me(
-                motor_angles)
-        cur_state = observation_to_state(observation, motion_id, phases[i+1])
+            observation = env.step_me(
+                    motor_angles)
+            cur_state = observation_to_state(observation, motion_id, phases[i+1])
     
 
 
@@ -249,7 +253,7 @@ if __name__ == "__main__":
     if example_traj:
         expert_trajectory = load_motion_file("/home/mz/quadruped_learning/data_retargetted_motion/pace.txt", sim_timestep=0.005, frame_duration_override=0.04)
         num_frames, all_states, all_actions = expert_trajectory_to_states_actions(expert_trajectory=expert_trajectory, num_repeats=5)
-    example_train = False
+    example_train = True
     motion_files_ids = {0: "/home/mz/quadruped_learning/data_retargetted_motion/pace.txt",
                         1: "/home/mz/quadruped_learning/data_retargetted_motion/canter.txt",
                         2: "/home/mz/quadruped_learning/data_retargetted_motion/left turn0.txt",

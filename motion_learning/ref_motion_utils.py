@@ -105,18 +105,18 @@ def load_motion_file(filename: str, sim_timestep: float = 0.005,
     motion_total_time = num_frames * frame_duration
     num_timesteps_in_traj = motion_total_time / sim_timestep
     simsteps_per_frame = num_timesteps_in_traj // num_frames
-    # return expand_frames(frames, int(simsteps_per_frame))
-    return frames
+    return expand_frames(frames, int(simsteps_per_frame))
 
 
-def load_ref_motions(filenames: List[str]):
+def load_ref_motions(filenames: List[str], sim_timestep: float = 0.005,
+                     frame_duration_override: Union[float, None] = None):
     num_files = len(filenames)
     if num_files == 0:
         raise ValueError("No reference motions specified.")
 
     motions = []
     for filename in filenames:
-        frames = load_motion_file(filename)
+        frames = load_motion_file(filename, sim_timestep=sim_timestep, frame_duration_override=frame_duration_override)
         motions.append(frames)
 
     return motions
