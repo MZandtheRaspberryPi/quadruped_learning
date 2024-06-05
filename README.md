@@ -21,5 +21,10 @@ We also made a version of this simulation environment that plugs in [tensorflow-
 
 ![sim](./assets/example_simulation.PNG)
 
+## Learning Approaches
+We implemented and tested a behavioral cloning approach that performed well when the robot was in a state similiar to the examples. It performed poorly when outside.
+
+We started to teach an actor-critic model, but didn't deploy the model.
+
 
 
