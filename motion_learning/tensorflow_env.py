@@ -1,3 +1,4 @@
+import copy
 import os
 # Keep using keras-2 (tf-keras) rather than keras-3 (keras).
 os.environ['TF_USE_LEGACY_KERAS'] = '1'
@@ -45,8 +46,9 @@ from tf_agents.train.utils import spec_utils
 from tf_agents.train.utils import strategy_utils
 from tf_agents.train.utils import train_utils
 
+from env import SimEnv, build_env
 from agent import ACTION_SPEC, OBSERVATION_SPEC, INPUT_TENSOR_SPEC, ACTION_SPEC, OBSERVED_STATE_SIZE, ActionNet
-from robot import Robot, MotorControlMode, Observation, URDF_FILENAME, INIT_POS, INIT_ROT, Pose, SIM_MOTOR_IDS, DEFAULT_MOTOR_ANGLES
+from robot import Robot, MotorControlMode, Observation, URDF_FILENAME, INIT_POS, INIT_ROT, Pose, SIM_MOTOR_IDS, DEFAULT_MOTOR_ANGLES, DEFAULT_ROBOT_POSE
 from ref_motion_utils import load_ref_motions, POS_SIZE, ROT_SIZE
 from util import euler_from_quaternion
 
@@ -128,54 +130,24 @@ def all_states_to_expert_state_vector(all_frames: ArrayLike, timestep: float):
         expert_observed_states[i, 4:] = cur_motor_angles
     return expert_observed_states
 
-class SimEnv(py_environment.PyEnvironment):
-    def __init__(self, config: SimParams, reference_motions: List[NDArray], show_reference_model_flag: bool = False,
-                 discount_factor: float = 0.97, num_motion_repeats: int = 3):
+class TfSimEnv(py_environment.PyEnvironment):
+    def __init__(self, reference_motions: List[NDArray], show_reference_model_flag: bool = False,
+                 discount_factor: float = 0.97, default_pose = DEFAULT_ROBOT_POSE, num_motion_repeats = 3,
+                 sim_time_step= 0.005):
         """_summary_
 
         Args:
             config (SimParams): _description_
             task (Callable): callable to calc reward and termination condition, takes sim env as arg
         """
-        self.config = config
-        self.render_flag: bool = self.config.enable_rendering
-        self.discount_factor = discount_factor
-
-        self.num_bullet_solver_iterations = int(NUM_SIMULATION_ITERATION_STEPS /
-                                                self.config.num_action_repeat)
-        self.env_timestep = self.config.num_action_repeat * self.config.sim_time_step
-
-        self.ground = None
-        self._robot: Robot = None
-        self.env_step_counter = 0
-
-        if self.render_flag:
-            self._pybullet_client = bullet_client.BulletClient(
-                connection_mode=pybullet.GUI)
-            self._pybullet_client.configureDebugVisualizer(
-                pybullet.COV_ENABLE_RENDERING,
-                self.config.enable_rendering_gui)
-            self._pybullet_client.configureDebugVisualizer(
-                pybullet.COV_ENABLE_SINGLE_STEP_RENDERING,
-                1)
-            # should we add a parameter to show reference?
-        else:
-            self._pybullet_client = bullet_client.BulletClient(
-                connection_mode=pybullet.DIRECT)
-
-        self._pybullet_client.setAdditionalSearchPath(pd.getDataPath())
-
-        if self.config.egl_rendering:
-            self._pybullet_client.loadPlugin('eglRendererPlugin')
         self.num_motion_repeats = num_motion_repeats
-        self.reference_motions = reference_motions
+        self.sim_time_step = sim_time_step
         self.num_frames, self.transformed_reference_motions, self.all_actions = expert_trajectory_to_states_actions(reference_motions[0], self.num_motion_repeats)
-        self.expert_state_vector = all_states_to_expert_state_vector(self.transformed_reference_motions, self.config.sim_time_step)
+        self.expert_state_vector = all_states_to_expert_state_vector(self.transformed_reference_motions, sim_time_step)
 
-        self.show_reference_model_flag = show_reference_model_flag
-        self.reference_quadruped = None
+        self._env = build_env(reference_motions, enable_rendering=True, show_reference_motion=show_reference_model_flag,
+                sim_time_step=sim_time_step, default_pose = default_pose, discount_factor=discount_factor)
 
-        self.last_frame_time = time.time()
         self._action_spec = ACTION_SPEC
         self._observation_spec = OBSERVATION_SPEC
         self._state = None
@@ -191,171 +163,49 @@ class SimEnv(py_environment.PyEnvironment):
         return self._observation_spec
 
     def get_sim_timestep(self):
-        return self.config.sim_time_step
+        return self._env.get_sim_timestep()
 
-    def show_reference_model(self):
-        self.reference_quadruped = self._pybullet_client.loadURDF(
-            URDF_FILENAME, INIT_POS, INIT_ROT, useFixedBase=True)
-        alpha = 0.5
-        ref_col = [1, 1, 1, alpha]
-
-        self._pybullet_client.changeDynamics(
-            self.reference_quadruped, -1, linearDamping=0, angularDamping=0)
-
-        self._pybullet_client.setCollisionFilterGroupMask(
-            self.reference_quadruped, -1, collisionFilterGroup=0, collisionFilterMask=0)
-
-        self._pybullet_client.changeDynamics(
-            self.reference_quadruped,
-            -1,
-            activationState=self._pybullet_client.ACTIVATION_STATE_SLEEP +
-            self._pybullet_client.ACTIVATION_STATE_ENABLE_SLEEPING +
-            self._pybullet_client.ACTIVATION_STATE_DISABLE_WAKEUP)
-
-        self._pybullet_client.changeVisualShape(
-            self.reference_quadruped, -1, rgbaColor=ref_col)
-
-        num_joints = self._pybullet_client.getNumJoints(
-            self.reference_quadruped)
-
-        for j in range(num_joints):
-            self._pybullet_client.setCollisionFilterGroupMask(
-                self.reference_quadruped, j, collisionFilterGroup=0, collisionFilterMask=0)
-
-            self._pybullet_client.changeDynamics(
-                self.reference_quadruped,
-                j,
-                activationState=self._pybullet_client.ACTIVATION_STATE_SLEEP +
-                self._pybullet_client.ACTIVATION_STATE_ENABLE_SLEEPING +
-                self._pybullet_client.ACTIVATION_STATE_DISABLE_WAKEUP)
-
-            self._pybullet_client.changeVisualShape(
-                self.reference_quadruped, j, rgbaColor=ref_col)
-
-    def set_ref_model_pose(self, pose: Pose):
-        self._pybullet_client.resetBasePositionAndOrientation(self.reference_quadruped,
-                                                              pose.root_position,
-                                                              pose.root_orientation)
-        for j in range(len(pose.joint_angles)):
-            joint_index = SIM_MOTOR_IDS[j]
-            joint_target_angle = pose.joint_angles[j]
-            j_info = self._pybullet_client.getJointInfo(
-                self.reference_quadruped, joint_index)
-            j_state = self._pybullet_client.getJointStateMultiDof(
-                self.reference_quadruped, joint_index)
-            j_pose_size = len(j_state[0])
-            j_vel_size = len(j_state[1])
-
-            if (j_pose_size > 0):
-                j_pose = np.array([joint_target_angle])
-                j_vel = np.zeros(j_vel_size)
-                self._pybullet_client.resetJointStateMultiDof(
-                    self.reference_quadruped, joint_index, j_pose, j_vel)
-                
     def _reset(self):
-        obs = self.reset_me()
+        obs = self._env.reset_me()
         self._state = 0
         self._episode_ended = False
         self._reward_idx = 0
         obs_vect = observed_state_to_vector(obs)
         return ts.restart(obs_vect)
 
-    def reset_me(self):
-
-        if self.render_flag:
-            self._pybullet_client.configureDebugVisualizer(
-                self._pybullet_client.COV_ENABLE_RENDERING, self.config.enable_rendering_gui)
-            self._pybullet_client.configureDebugVisualizer(
-                pybullet.COV_ENABLE_SINGLE_STEP_RENDERING,
-                1)
-
-        # Clear the simulation world and rebuild the robot interface.
-        self._pybullet_client.resetSimulation()
-        self._pybullet_client.setPhysicsEngineParameter(
-            numSolverIterations=self.num_bullet_solver_iterations)
-        self._pybullet_client.setTimeStep(self.config.sim_time_step)
-        self._pybullet_client.setGravity(0, 0, -10)
-
-        # Rebuild the world.
-        self.ground = self._pybullet_client.loadURDF(GROUND_URDF_FILENAME)
-
-        self._pybullet_client.setPhysicsEngineParameter(enableConeFriction=0)
-        self.env_step_counter = 0
-
-        self._pybullet_client.resetDebugVisualizerCamera(self.config.camera_distance,
-                                                         self.config.camera_yaw,
-                                                         self.config.camera_pitch,
-                                                         [0, 0, 0])
-
-        if self.render_flag:
-            self._pybullet_client.configureDebugVisualizer(
-                self._pybullet_client.COV_ENABLE_RENDERING, self.config.enable_rendering_gui)
-            self._pybullet_client.configureDebugVisualizer(
-                pybullet.COV_ENABLE_SINGLE_STEP_RENDERING,
-                1)
-        # Rebuild the robot
-        self._robot = Robot(self._pybullet_client, action_repeat=1)
-        self._robot.reset()
-
-        if self.show_reference_model_flag:
-            self.show_reference_model()
-
-        self.last_frame_time = time.time()
-        return self.get_observation()
-
-    def get_observation(self):
-        return self._robot.get_observation()
-    
-    def update_camera_and_sleep(self):
-        # Sleep, otherwise the computation takes less time than real time,
-        # which will make the visualization like a fast-forward video.
-        time_spent = time.time() - self.last_frame_time
-        self.last_frame_time = time.time()
-        time_to_sleep = self.config.sim_time_step - time_spent
-        if time_to_sleep > 0:
-            time.sleep(time_to_sleep)
-        obs = self.get_observation()
-        base_pos = obs.base_position
-
-        # Also keep the previous orientation of the camera set by the user.
-        [yaw, pitch,
-            dist] = self._pybullet_client.getDebugVisualizerCamera()[8:11]
-        self._pybullet_client.resetDebugVisualizerCamera(dist, yaw, pitch,
-                                                            base_pos)
-        self._pybullet_client.configureDebugVisualizer(
-            self._pybullet_client.COV_ENABLE_SINGLE_STEP_RENDERING, 1)
     
     def calculate_reward(self, reward_idx: int, observation_vector):
         expert_idx = reward_idx % self.expert_state_vector.shape[0]
         goal_row = self.expert_state_vector[expert_idx]
-        return -tf.norm(goal_row - observation_vector)
+        return -tf.norm(goal_row - observation_vector) + self._reward_idx
     
     def _step(self, action):
         if len(action.shape) > 1:
             action = action[0]
-        if self.render_flag:
-            self.update_camera_and_sleep()
 
         if self._episode_ended:
             # The last action ended the episode. Ignore the current action and start
             # a new episode.
             return self.reset()
+        
 
         # Make sure episodes don't go on forever.
         if self._reward_idx == self.transformed_reference_motions.shape[0]:
             self._episode_ended = True
 
         if self._episode_ended:
-            obs = self.get_observation()
+            obs = self._env.get_observation()
             obs_vect = observed_state_to_vector(obs)
-            # reward = self.calculate_reward(self._reward_idx, obs_vect)
-            reward = tf.norm(action)
+            reward = self.calculate_reward(self._reward_idx, obs_vect)
             return ts.termination(obs_vect, reward)
         else:
             # robot class and put the logics here.
-            new_observation = self._robot.step(action)
+            new_observation = self._env._robot.step(action)
             self._reward_idx += 1
             obs_vect = observed_state_to_vector(new_observation)
+            
+            if self._env.render_flag:
+                self._env.update_camera_and_sleep()
             if not new_observation.is_safe:
                 self._episode_ended = True
                 reward = -10
@@ -367,116 +217,7 @@ class SimEnv(py_environment.PyEnvironment):
                 new_observation.motor_angles = next_target_motor_angles
                 obs_vect = observed_state_to_vector(new_observation)
                 return ts.transition(
-                    obs_vect, reward=reward, discount=self.discount_factor**self._reward_idx)
-
-    def step_me(self, action: "np.array"):
-        if self.render_flag:
-            self.update_camera_and_sleep()
-
-        # robot class and put the logics here.
-        new_observation = self._robot.step(action)
-
-        self.env_step_counter += 1
-        return new_observation
-
-    def play_motion_files_with_movements(self, repeats_per_file: int = 3):
-        for frames in self.reference_motions:
-            for _ in range(repeats_per_file):
-                previous_observation = self.reset_me()
-                for i in range(frames.shape[0]):
-                    frame = frames[i]
-                    pos = frame[:POS_SIZE]
-                    rot = frame[POS_SIZE:POS_SIZE + ROT_SIZE]
-                    actions = frame[POS_SIZE + ROT_SIZE:]
-                    pose = Pose(pos, rot, actions)
-
-                    if self.show_reference_model_flag:
-                        self.set_ref_model_pose(pose)
-
-                    # print(actions)
-                    new_observation = self.step_me(
-                        actions)
-                    time.sleep(0.1)
-                    # env._pybullet_client.stepSimulation()
-
-
-def build_env(reference_motions: List[NDArray],
-              enable_rendering: bool, show_reference_motion: bool = False, sim_time_step: float = 0.005) -> SimEnv:
-    if len(reference_motions) < 1:
-        raise ValueError
-    sim_params = SimParams()
-    sim_params.enable_rendering = enable_rendering
-    sim_params.allow_knee_contact = True
-    sim_params.sim_time_step = sim_time_step
-
-    env = SimEnv(sim_params, reference_motions, show_reference_motion)
-    return env
-
-
-def test_pid_controller(tol: float = 0.1):
-    motion_files = ["/home/mz/quadruped_learning/data_retargetted_motion/pace.txt"]
-    list_of_motion_frames = load_ref_motions(motion_files)
-    env = build_env(list_of_motion_frames, enable_rendering=True,
-                    show_reference_motion=True)
-
-    for i in range(len(DEFAULT_MOTOR_ANGLES)):
-        print(f"commanding {i} motor")
-        motor_angles = np.copy(DEFAULT_MOTOR_ANGLES)
-        motor_angles[i] += np.pi / 4
-
-        previous_observation = env.get_observation()
-        pos = INIT_POS
-        rot = INIT_ROT
-        pose = Pose(pos, rot, motor_angles)
-        print(pose.joint_angles)
-        env.set_ref_model_pose(pose)
-
-        while True:
-            diffs = np.abs(motor_angles - previous_observation.motor_angles)
-            print(diffs)
-            if all(diffs < tol):
-                env.reset()
-                break
-            previous_observation, reward, done, _ = env.step_me(
-                motor_angles, previous_observation)
-            time.sleep(0.01)
-
-
-def test_env():
-    motion_files = ["/home/mz/quadruped_learning/data_retargetted_motion/pace.txt"]
-    list_of_motion_frames = load_ref_motions(motion_files)
-    env = build_env(list_of_motion_frames, enable_rendering=True,
-                    show_reference_motion=True)
-
-    env.play_motion_files_with_movements(repeats_per_file=1)
-
-def compute_avg_return(environment, policy, num_episodes=5):
-
-  total_return = 0.0
-  for _ in range(num_episodes):
-
-    time_step = environment.reset()
-    episode_return = 0.0
-
-    while not time_step.is_last():
-      action_step = policy.action(time_step)
-      time_step = environment.step(action_step.action)
-      episode_return += time_step.reward
-    total_return += episode_return
-
-  avg_return = total_return / num_episodes
-  return avg_return
-
-def collect_episode(environment, policy, num_episodes, rb_observer):
-
-    driver = py_driver.PyDriver(
-        environment,
-        py_tf_eager_policy.PyTFEagerPolicy(
-            policy, use_tf_function=True),
-        [rb_observer],
-        max_episodes=num_episodes)
-    initial_time_step = environment.reset()
-    driver.run(initial_time_step)
+                    obs_vect, reward=reward, discount=self._env.discount_factor**self._reward_idx)
 
 
 def main():
@@ -488,8 +229,10 @@ def main():
     list_of_motion_frames = load_ref_motions(motion_files)
     # env = build_env(list_of_motion_frames, enable_rendering=True,
     #                 show_reference_motion=False)
-    train_env = build_env(list_of_motion_frames, enable_rendering=True,
-                    show_reference_motion=False)
+    pose = copy.copy(DEFAULT_ROBOT_POSE)
+    pose.root_position[2] = 0.1
+    train_env = TfSimEnv(list_of_motion_frames, show_reference_model_flag=False,
+                 discount_factor=0.97, default_pose = pose)
     train_env.reset()
     # env_name = "MinitaurBulletEnv-v0"
     # train_env = env = suite_pybullet.load(env_name)
@@ -497,9 +240,10 @@ def main():
     
     # Use "num_iterations = 1e6" for better results (2 hrs)
     # 1e5 is just so this doesn't take too long (1 hr)
-    num_iterations = 1e6
+    num_iterations = int(1e6)
 
     initial_collect_steps = 10000 # @param {type:"integer"}
+    # initial_collect_steps = 10 # @param {type:"integer"}
     collect_steps_per_iteration = 1 # @param {type:"integer"}
     replay_buffer_capacity = 10000 # @param {type:"integer"}
 
@@ -692,6 +436,8 @@ def main():
     returns = [avg_return]
 
     for _ in range(num_iterations):
+        if _ % 100000 == 0 and _ != 0:
+            print("hi")
         # Training.
         collect_actor.run()
         loss_info = agent_learner.run(iterations=1)
@@ -711,6 +457,6 @@ def main():
     reverb_server.stop()
 
 if __name__ == "__main__":
-    # main()
-    test_env()
+    main()
+    # test_env()
     # test_pid_controller()

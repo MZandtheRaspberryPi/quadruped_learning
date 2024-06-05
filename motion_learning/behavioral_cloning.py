@@ -2,7 +2,7 @@ import os
 from typing import Tuple, List, Union, Dict
 import time
 
-from robot import Observation, INIT_POS, INIT_ROT, Pose
+from robot import Observation, INIT_POS, INIT_ROT, Pose, DEFAULT_MOTOR_ANGLES
 from ref_motion_utils import POS_SIZE, ROT_SIZE, load_motion_file
 from env import build_env
 from util import euler_from_quaternion
@@ -208,7 +208,7 @@ def test_scenario(motions_and_ids: Dict[int, str],
                   cache_dir: str = "/home/mz/quadruped_learning/motion_learning/bc_cache",
                   sim_timestep: float = 0.005,
                   num_loops: int = 10,
-                  frame_duration_override: float = 0.1 ):
+                  frame_duration_override: float = 0.01):
     file_path = motions_and_ids[motion_id]
     expert_trajectory = load_motion_file(file_path, sim_timestep=sim_timestep, frame_duration_override=frame_duration_override)
     states, actions = expert_trajectory_to_states_actions(expert_trajectory=expert_trajectory,
@@ -225,43 +225,94 @@ def test_scenario(motions_and_ids: Dict[int, str],
         bias_file = os.path.join(cache_dir, expected_biases_file_name)
         bias_arr = np.load(bias_file)
         params.append((jnp.array(weights_arr), jnp.array(bias_arr)))
+    root_pos = expert_trajectory[0, :POS_SIZE]
+    root_pos[2] = 0.1
+    root_orientation = expert_trajectory[0, POS_SIZE:POS_SIZE+ROT_SIZE]
+    default_angles = expert_trajectory[0, POS_SIZE+ROT_SIZE:]
+    # default_angles = np.copy(DEFAULT_MOTOR_ANGLES)
+    # default_angles = np.zeros((8))
+    default_pose = Pose(root_pos, root_orientation, default_angles)
     env = build_env(reference_motions=[expert_trajectory],
-              enable_rendering=True, show_reference_motion=True, sim_time_step=sim_timestep)
-    for _ in range(num_loops):
-        env.reset_me()
-        observation = env.get_observation()
-        phases = states[:, 0]
-        cur_state = observation_to_state(observation, motion_id, phases[0])
-        for i in range(len(phases) - 1):
+              enable_rendering=True, show_reference_motion=False, sim_time_step=sim_timestep,
+              default_pose=default_pose)
+    pos = np.copy(INIT_POS)
+    pos[2] += 0.5
+    rot = np.copy(INIT_ROT)
+    env.reset_me()
+    observation = env.get_observation()
+    phases = states[:, 1]
+    cur_state = observation_to_state(observation, motion_id, phases[0])
+    num_expert_commands = len(phases)
+    commanded_motor_angles = np.zeros((num_loops * num_expert_commands, 8))
+    observed_motor_angles = np.zeros((num_loops * num_expert_commands, 8))
+    expert_motor_angles = np.zeros((num_loops * num_expert_commands, 8))
+    seconds_until_fall: float = -1
+    x_distance_traveled = 0
+    start_time = time.time()
+    for n in range(num_loops):
+        for i in range(num_expert_commands):
             
             motor_angles = predict(params, cur_state)
+            commanded_motor_angles[n*num_expert_commands + i, :] = motor_angles
             # true_motor_angles = states[i, 1 + 1 + len(observation.base_orientation_euler) + len(observation.base_angular_velocity):]
             true_motor_angles = expert_trajectory[i, POS_SIZE + ROT_SIZE:]
-            pos = INIT_POS
-            rot = INIT_ROT
+            expert_motor_angles[n*num_expert_commands + i, :] = true_motor_angles
+
             pose = Pose(pos, rot, true_motor_angles)
-            env.set_ref_model_pose(pose)
+            # env.set_ref_model_pose(pose)
 
             observation = env.step_me(
                     motor_angles)
-            cur_state = observation_to_state(observation, motion_id, phases[i+1])
+            observed_motor_angles[n*num_expert_commands + i, :] = observation.motor_angles
+            next_phase_idx = i + 1 if i + 1 < len(phases) else 0
+            cur_state = observation_to_state(observation, motion_id, phases[next_phase_idx])
+            if not observation.is_safe:
+                break
+        if not observation.is_safe:
+                break
+    end_time = time.time()
+    if not observation.is_safe:
+        seconds_until_fall = (n*num_expert_commands + i) * env.get_sim_timestep()
+    x_distance_traveled = observation.base_position[0]
+    num_motors = 8
+    fig, axes = plt.subplots(
+                nrows=num_motors, ncols=1, sharex=True, sharey=True,
+                figsize=(10,10))
+    fig.suptitle(f"Behavioral Cloning Experiment")
+    time_steps = np.array(range(commanded_motor_angles.shape[0]))
+    for i in range(num_motors):
+        if i == 0:
+            labels= ["cmd", "expert", "observed"]
+        else:
+            labels=['_nolegend_'] * 3
+        axes[i].plot(time_steps, commanded_motor_angles[:, i], color="red", label=labels[0])
+        axes[i].plot(time_steps, expert_motor_angles[:, i], color="green", label=labels[1])
+        axes[i].plot(time_steps, observed_motor_angles[:, i], color="blue", label=labels[2])
+        axes[i].set_ylabel(f"{i}")
+    fig.text(0.5, 0.04, f'timestep ({env.get_sim_timestep()} seconds)', ha='center')
+    fig.text(0.02, 0.5, 'angle (rads) (per motor)', va='center', rotation='vertical')
+    fig.text(0.5, 0.02, f'time_to_fall: {round(seconds_until_fall, 2)}, x_distance: {round(x_distance_traveled, 2)}, timesteps_per_cycle: {num_expert_commands}', ha='center')
+    fig.legend()
+    plt.show()
+    fig.savefig(os.path.join(cache_dir, "bc_motor_angles_testing.png"))
     
 
 
 if __name__ == "__main__":
     example_traj = False
+    frame_duration_override = None
     if example_traj:
-        expert_trajectory = load_motion_file("/home/mz/quadruped_learning/data_retargetted_motion/pace.txt", sim_timestep=0.005, frame_duration_override=0.04)
+        expert_trajectory = load_motion_file("/home/mz/quadruped_learning/data_retargetted_motion/pace.txt", sim_timestep=0.005, frame_duration_override=frame_duration_override)
         num_frames, all_states, all_actions = expert_trajectory_to_states_actions(expert_trajectory=expert_trajectory, num_repeats=5)
-    example_train = True
+    example_train = False
     motion_files_ids = {0: "/home/mz/quadruped_learning/data_retargetted_motion/pace.txt",
                         1: "/home/mz/quadruped_learning/data_retargetted_motion/canter.txt",
                         2: "/home/mz/quadruped_learning/data_retargetted_motion/left turn0.txt",
                         3: "/home/mz/quadruped_learning/data_retargetted_motion/right turn0.txt",
                         4: "/home/mz/quadruped_learning/data_retargetted_motion/trot.txt"}
     if example_train:
-        train(motion_files_ids)
+        train(motion_files_ids, frame_duration_override=frame_duration_override)
     example_test = True
     if example_test:
-       test_scenario(motion_files_ids, motion_id=4)
+       test_scenario(motion_files_ids, motion_id=4, frame_duration_override=frame_duration_override)
 

@@ -56,8 +56,11 @@ class Robot:
                  init_pos=INIT_POS, init_rot=INIT_ROT, lower_motor_limit: float = LOWER_MOTOR_LIMIT,
                  upper_motor_limit: float = UPPER_MOTOR_LIMIT, clip_motor_commands: bool = False,
                  time_step: float = 0.001, motor_directions: Tuple[int] = MOTOR_DIRECTIONS, motor_offsets: Tuple[int] = MOTOR_OFFSETS,
-                 urdf_file_name: str = URDF_FILENAME, action_repeat: int = 33, default_pose: Pose = DEFAULT_ROBOT_POSE, render: bool = False):
+                 urdf_file_name: str = URDF_FILENAME, action_repeat: int = 1, default_pose: Pose = DEFAULT_ROBOT_POSE, render: bool = False,
+                 skip_settle_down: bool = False):
         self._pybullet_client = pybullet_client
+        self.render = render
+        self.skip_settle_down = skip_settle_down
         self.noisy = noisy
         self.quadruped = self._pybullet_client.loadURDF(
             urdf_file_name, init_pos, init_rot, flags=pybullet.URDF_USE_INERTIA_FROM_FILE)
@@ -101,6 +104,11 @@ class Robot:
         num_steps_to_reset = int(reset_time / self.time_step)
         for _ in range(num_steps_to_reset):
             observation = self.step(default_motor_angles)
+            # here env won't render so we do
+            if self.render:
+                self._pybullet_client.configureDebugVisualizer(
+                    pybullet.COV_ENABLE_SINGLE_STEP_RENDERING,
+                    1)
 
     def set_pose(self, pose: Pose):
         num_joints = len(pose.joint_angles)
@@ -122,7 +130,7 @@ class Robot:
                 pybullet.resetJointStateMultiDof(
                     self.quadruped, joint_index, j_pose, j_vel)
 
-    def reset(self, reset_time: float = 0.5):
+    def reset(self, reset_time: float = 0.2):
 
         self._pybullet_client.resetBasePositionAndOrientation(
             self.quadruped, self.init_pos,
@@ -140,9 +148,14 @@ class Robot:
                                                  angularDamping=0)
 
         self.set_pose(self.default_pose)
+        if self.render:
+            self._pybullet_client.configureDebugVisualizer(
+                pybullet.COV_ENABLE_SINGLE_STEP_RENDERING,
+                1)
         self.build_joint_name_dict()
         self.state_action_counter = 0
-        self.settle_down_for_reset(reset_time, self.default_pose.joint_angles)
+        if not self.skip_settle_down:
+            self.settle_down_for_reset(reset_time, self.default_pose.joint_angles)
         # this seems important, perhaps there's a default motor controller in pybullet
         for joint_index in self.motor_ids:
             self._pybullet_client.setJointMotorControl2(

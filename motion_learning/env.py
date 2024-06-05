@@ -15,7 +15,7 @@ import pybullet
 import pybullet_utils.bullet_client as bullet_client
 import pybullet_data as pd
 
-from robot import Robot, MotorControlMode, Observation, URDF_FILENAME, INIT_POS, INIT_ROT, Pose, SIM_MOTOR_IDS, DEFAULT_MOTOR_ANGLES
+from robot import Robot, MotorControlMode, Observation, DEFAULT_ROBOT_POSE, URDF_FILENAME, INIT_POS, INIT_ROT, Pose, SIM_MOTOR_IDS, DEFAULT_MOTOR_ANGLES
 from ref_motion_utils import load_ref_motions, POS_SIZE, ROT_SIZE
 from util import euler_from_quaternion
 
@@ -102,7 +102,7 @@ def all_states_to_expert_state_vector(all_frames: ArrayLike, timestep: float):
 
 class SimEnv:
     def __init__(self, config: SimParams, reference_motions: List[NDArray], show_reference_model_flag: bool = False,
-                 discount_factor: float = 0.97, num_motion_repeats: int = 3):
+                 discount_factor: float = 0.97, num_motion_repeats: int = 3, default_pose = DEFAULT_ROBOT_POSE):
         """_summary_
 
         Args:
@@ -116,6 +116,8 @@ class SimEnv:
         self.num_bullet_solver_iterations = int(NUM_SIMULATION_ITERATION_STEPS /
                                                 self.config.num_action_repeat)
         self.env_timestep = self.config.num_action_repeat * self.config.sim_time_step
+
+        self.default_pose = default_pose
 
         self.ground = None
         self._robot: Robot = None
@@ -225,7 +227,8 @@ class SimEnv:
         init_pos = np.copy(INIT_POS)
         init_pos[1] = -0.3
         init_pos[2] += 0.3
-        self._ref_robot = Robot(self._pybullet_client, action_repeat=1, init_pos=init_pos)
+        self._ref_robot = Robot(self._pybullet_client, action_repeat=1, init_pos=init_pos, skip_settle_down=True,
+                                time_step=self.get_sim_timestep(), clip_motor_commands=False)
         self._ref_robot.reset()
             
     def set_pose(self, robot, pose):
@@ -240,7 +243,6 @@ class SimEnv:
     def set_ref_model_pose(self, pose: Pose):
         full_pose = np.hstack([pose.root_position, pose.root_orientation, pose.joint_angles])
         self.set_pose(self._ref_robot.quadruped, full_pose)
-        self.update_camera_and_sleep()
                 
 
     def reset_me(self):
@@ -279,7 +281,7 @@ class SimEnv:
                 pybullet.COV_ENABLE_SINGLE_STEP_RENDERING,
                 1)
         # Rebuild the robot
-        self._robot = Robot(self._pybullet_client, action_repeat=1)
+        self._robot = Robot(self._pybullet_client, action_repeat=1, default_pose=self.default_pose, render=self.render_flag, time_step=self.get_sim_timestep())
         self._robot.reset()
 
         if self.show_reference_model_flag:
@@ -353,11 +355,11 @@ class SimEnv:
                 return obs_vect, reward, self.discount_factor * (self.discount_factor**self._reward_idx)
 
     def step_me(self, action: "np.array"):
-        if self.render_flag:
-            self.update_camera_and_sleep()
 
         # robot class and put the logics here.
         new_observation = self._robot.step(action)
+        if self.render_flag:
+            self.update_camera_and_sleep()
 
         self.env_step_counter += 1
         return new_observation
@@ -388,7 +390,10 @@ class SimEnv:
 
 
 def build_env(reference_motions: List[NDArray],
-              enable_rendering: bool, show_reference_motion: bool = False, sim_time_step: float = 0.005) -> SimEnv:
+              enable_rendering: bool, show_reference_motion: bool = False,
+                sim_time_step: float = 0.005,
+                default_pose = DEFAULT_ROBOT_POSE,
+                discount_factor: float = 0.97) -> SimEnv:
     if len(reference_motions) < 1:
         raise ValueError
     sim_params = SimParams()
@@ -396,7 +401,8 @@ def build_env(reference_motions: List[NDArray],
     sim_params.allow_knee_contact = True
     sim_params.sim_time_step = sim_time_step
 
-    env = SimEnv(sim_params, reference_motions, show_reference_motion)
+    env = SimEnv(sim_params, reference_motions, show_reference_motion, default_pose=default_pose,
+                 discount_factor=discount_factor)
     return env
 
 
