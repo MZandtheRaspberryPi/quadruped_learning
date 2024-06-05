@@ -93,15 +93,14 @@ class Robot:
         self.action_repeat = action_repeat
         self.joint_name_to_id = {}
 
-    def settle_down_for_reset(self, reset_time: float = 1, default_motor_angles: NDArray = DEFAULT_ROBOT_POSE):
-        observation = self.get_observation()
+    def settle_down_for_reset(self, reset_time: float = 0.5, default_motor_angles: NDArray = DEFAULT_ROBOT_POSE):
 
         if reset_time <= 0:
             return
 
         num_steps_to_reset = int(reset_time / self.time_step)
         for _ in range(num_steps_to_reset):
-            observation = self.step(default_motor_angles, observation)
+            observation = self.step(default_motor_angles)
 
     def set_pose(self, pose: Pose):
         num_joints = len(pose.joint_angles)
@@ -123,7 +122,7 @@ class Robot:
                 pybullet.resetJointStateMultiDof(
                     self.quadruped, joint_index, j_pose, j_vel)
 
-    def reset(self, reset_time: float = 3):
+    def reset(self, reset_time: float = 0.5):
 
         self._pybullet_client.resetBasePositionAndOrientation(
             self.quadruped, self.init_pos,
@@ -222,7 +221,8 @@ class Robot:
                           motor_angles, motor_velocities, is_safe)
         return obs
 
-    def apply_action(self, motor_commands: NDArray, observation: Observation):
+    def apply_action(self, motor_commands: NDArray):
+        # , observation: Observation
 
         if self.clip_motor_commands:
             motor_commands = np.where(
@@ -253,11 +253,9 @@ class Robot:
                 forces=[MAX_ABS_TORQUE]*len(motor_commands),
         )
 
-    def step(self, motor_commands: "np.array", previous_observation: Observation):
-        new_observation = previous_observation
+    def step(self, motor_commands: "np.array"):
         for i in range(self.action_repeat):
-            self.apply_action(motor_commands=motor_commands,
-                              observation=new_observation)
+            self.apply_action(motor_commands=motor_commands) # , observation=new_observation
             self._pybullet_client.stepSimulation()
             new_observation = self.get_observation()
         self.state_action_counter += 1

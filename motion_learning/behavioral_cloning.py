@@ -1,9 +1,13 @@
+import os
 from typing import Tuple, List, Union, Dict
+import time
 
-from robot import Observation
+from robot import Observation, INIT_POS, INIT_ROT, Pose
 from ref_motion_utils import POS_SIZE, ROT_SIZE, load_motion_file
 from env import build_env
 from util import euler_from_quaternion
+
+import matplotlib.pyplot as plt
 
 import numpy as np
 import jax
@@ -14,21 +18,16 @@ from jax.example_libraries import optimizers
 import matplotlib.pyplot as plt
 from tqdm.auto import tqdm
 
-
-
-"""
-state will be, 
-current: phase_variable, roll, pitch, roll rate, pitch rate, 8 joint angles from time step t+1, 8 joint angles from timea step t+5
-
-output will be 8 target joint angles
-"""
-STATE_SIZE = 21
+# we will actually do movement id, phase, orientation, velocity, cur_joint_angles. later we may add target motion to this
+STATE_SIZE = 16
 OUT_SIZE = 8
-# our observed state will use roll, pitch, roll rate, pitch rate, 8 joint angles we arrived at
-# and calculate rewards using this
-OBSERVED_STATE_SIZE = 2 + 2 + 8
 
-def expert_trajectory_to_states_actions(expert_trajectory: ArrayLike, num_repeats: int = 5) ->Tuple[int, ArrayLike, ArrayLike]:
+# Initialize neural network parameters
+LAYER_SIZES = (STATE_SIZE, 512, 512, OUT_SIZE)
+
+
+def expert_trajectory_to_states_actions(expert_trajectory: ArrayLike, trajectory_movement_id: int,
+                                        num_repeats: int = 1, sim_timestep: float = 0.005) ->Tuple[int, ArrayLike, ArrayLike]:
     """returns the number of frames before a loop, as well as an array like entry of stuff to calculate
     rolled out trajectories with.
 
@@ -40,7 +39,6 @@ def expert_trajectory_to_states_actions(expert_trajectory: ArrayLike, num_repeat
         Tuple[Dict[float, ArrayLike], ArrayLike]: _description_
     """
     num_frames = expert_trajectory.shape[0]
-    num_new_frames = num_frames * num_repeats
     phases = np.linspace(0, 1, num_frames)
     phases = np.hstack([phases] * num_repeats)
     phases = phases.reshape((phases.shape[0], 1))
@@ -49,17 +47,8 @@ def expert_trajectory_to_states_actions(expert_trajectory: ArrayLike, num_repeat
     # get the angles, which starts after phase, pos, rotation
     num_angles = all_frames[0, 1 + POS_SIZE + ROT_SIZE:].shape[0]
     all_actions = np.vstack([all_frames[1:, 1 + POS_SIZE + ROT_SIZE:], all_frames[0, 1 + POS_SIZE + ROT_SIZE:].reshape((1, num_angles))])
-    return num_frames, all_frames, all_actions
-
-
-def observed_state_to_vector(observation: Observation):
-   orientation = observation.base_orientation_euler
-   base_angular_vels = observation.base_angular_velocity
-   joint_angles = observation.motor_angles
-   return np.hstack([orientation[0:2], base_angular_vels[0:2], joint_angles])
-
-def all_states_to_expert_state_vector(all_frames: ArrayLike, timestep: float):
-    expert_observed_states = np.zeros((all_frames.shape[0], OBSERVED_STATE_SIZE))
+    all_states = np.zeros((all_actions.shape[0], STATE_SIZE))
+    all_states[:, 0] = trajectory_movement_id
     for i in range(all_frames.shape[0]):
         if i == 0:
             prev_index = all_frames.shape[0] - 1
@@ -67,35 +56,37 @@ def all_states_to_expert_state_vector(all_frames: ArrayLike, timestep: float):
             prev_index = i - 1
         prev_orientation = all_frames[prev_index, 1 + POS_SIZE:1+POS_SIZE + ROT_SIZE]
         orientation = all_frames[i, 1 + POS_SIZE:1+POS_SIZE + ROT_SIZE]
-        prev_roll, prev_pitch, prev_yaw = euler_from_quaternion(orientation[0], orientation[1], orientation[2], orientation[3])
+        prev_roll, prev_pitch, prev_yaw = euler_from_quaternion(prev_orientation[0], prev_orientation[1], prev_orientation[2], prev_orientation[3])
         roll, pitch, yaw = euler_from_quaternion(orientation[0], orientation[1], orientation[2], orientation[3])
-        roll_rate = roll / timestep
-        pitch_rate = pitch / timestep
+        roll_rate = (roll - prev_roll) / sim_timestep
+        pitch_rate = (pitch - prev_pitch) / sim_timestep
+        yaw_rate = (yaw - prev_yaw) / sim_timestep
         cur_motor_angles = all_frames[i, 1 + POS_SIZE + ROT_SIZE:]
-        expert_observed_states[i, 0:2] = np.array([roll, pitch])
-        expert_observed_states[i, 2:4] = np.array([roll_rate, pitch_rate])
-        expert_observed_states[i, 4:] = cur_motor_angles
-    return expert_observed_states
-        
+        # phase variable
+        all_states[i, 1] = all_frames[i, 0]
+        all_states[i, 2:5] = np.array([roll, pitch, yaw])
+        all_states[i, 5:8] = np.array([roll_rate, pitch_rate, yaw_rate])
+        all_states[i, 8:] = cur_motor_angles
+    
+    return all_states, all_actions
+
+def observation_to_state(obs: Observation, motion_id: int, phase: float):
+    state = np.zeros((STATE_SIZE))
+    state[0] = motion_id
+    state[1] = phase
+    state[2:5] = obs.base_orientation_euler
+    state[5:8] = obs.base_angular_velocity
+    state[8:] = obs.motor_angles
+    return state
+
+def observed_state_to_vector(observation: Observation):
+   orientation = observation.base_orientation_euler
+   base_angular_vels = observation.base_angular_velocity
+   joint_angles = observation.motor_angles
+   return np.hstack([orientation[0:2], base_angular_vels[0:2], joint_angles])
 
 
-def all_states_to_neural_network_input(cur_counter: int, all_frames: ArrayLike, num_frames_per_cycle: int, observation: Observation):
-   nn_inputs = np.zeros((STATE_SIZE, ))
-   # phase variable
-   nn_inputs[0] = all_frames[cur_counter][0]
-   orientation = observation.base_orientation
-   roll, pitch, yaw = orientation[0], orientation[1], orientation[2]
-   nn_inputs[1:3] = np.array([roll, pitch])
-   nn_inputs[3:5] = np.array([observation.base_angular_velocity[0], observation.base_angular_velocity[1]])
-   t_plus_1 = (cur_counter + 1) % num_frames_per_cycle
-   t_plus_5 = (cur_counter + 5) % num_frames_per_cycle
-   nn_inputs[5:13] = all_frames[t_plus_1][POS_SIZE + ROT_SIZE:]
-   nn_inputs[13:21] = all_frames[t_plus_5][POS_SIZE + ROT_SIZE:]
-   return nn_inputs
-      
 
-# Initialize neural network parameters
-LAYER_SIZES = (STATE_SIZE, 512, 512, OUT_SIZE)
 
 def relu(x):
   return jnp.maximum(0, x)
@@ -107,9 +98,9 @@ def random_layer_params(m, n, key, scale=1e-2, dtype=np.float32):
   return scale * random.normal(w_key, (n, m), dtype=dtype), scale * random.normal(b_key, (n,), dtype=dtype)
 
 # Initialize all layers for a fully-connected neural network with sizes "sizes"
-def init_network_params(sizes, key, dtype=np.float32):
+def init_network_params(sizes, key, scale=1e-2, dtype=np.float32):
   keys = random.split(key, len(sizes))
-  return [random_layer_params(m, n, k, dtype) for m, n, k in zip(sizes[:-1], sizes[1:], keys)]
+  return [random_layer_params(m, n, k, scale, dtype) for m, n, k in zip(sizes[:-1], sizes[1:], keys)]
 
 
 def predict(params: List[Tuple[ArrayLike]], x: ArrayLike):
@@ -125,39 +116,131 @@ def predict(params: List[Tuple[ArrayLike]], x: ArrayLike):
 
 batched_predict = jax.vmap(predict, in_axes=(None, 0))
 
-def loss(params: List[Tuple[ArrayLike]], nn_inputs: ArrayLike, expert_states: ArrayLike):
-    pass
+# so we run our sim steps, we get out a trajectory with the actual outputs from sim, goal outputs from expert traj
+# we could try to fit probability distribution to it
 
 
-def train(motion_file: str, seed: Union[int, None] = None) -> List[Tuple[ArrayLike]]:
+def loss(params, states, actions):
+  pred_actions = batched_predict(params, states)
+  return jnp.linalg.norm(actions - pred_actions)
+
+STEP_SIZE = 0.01
+@jax.jit
+def update(params, states, actions):
+  grads = jax.grad(loss)(params, states, actions)
+  return [(w - STEP_SIZE * dw, b - STEP_SIZE * db)
+          for (w, b), (dw, db) in zip(params, grads)]
+
+def train(motion_files_ids: Dict[int, str],
+          seed: Union[int, None] = None,
+          cache_dir: str = "/home/mz/quadruped_learning/motion_learning/bc_cache",
+          sim_timestep: float = 0.005) -> List[Tuple[ArrayLike]]:
+    os.makedirs(cache_dir, exist_ok=True)
+    num_epochs = 1000
+    batch_size = 200
     if seed is None:
         seed = 1
     key = jax.random.PRNGKey(seed)
-    params = init_network_params(LAYER_SIZES, key)
-    expert_trajectory = load_motion_file("/home/mz/quadruped_learning/data_retargetted_motion/pace.txt", sim_timestep=0.005, frame_duration_override=0.04)
-    num_frames_per_cycle, all_states, all_actions = expert_trajectory_to_states_actions(expert_trajectory=expert_trajectory, num_repeats=5)
+    params = init_network_params(LAYER_SIZES, key, dtype=np.float32)
 
-    env = build_env([expert_trajectory], enable_rendering=True,
-                show_reference_motion=True)
-    
-    observed_expert_states = all_states_to_expert_state_vector(all_states, env.get_sim_timestep())
+    all_states = []
+    all_actions = []
 
-    previous_observation = env.get_observation()
-    trajectories = []
-    cur_traj = np.zeros((all_states.shape[0], OBSERVED_STATE_SIZE))
-    for i in tqdm(range(all_states.shape[0])):
-        nn_input = all_states_to_neural_network_input(i, all_states,
-                                                      num_frames_per_cycle, previous_observation)
-        action = predict(params, nn_input)
-        new_observation = env.step(action, previous_observation)
-        observed_state_vector = observed_state_to_vector(new_observation)
-        cur_traj[i, :] = observed_state_vector
-        if not new_observation.is_safe:
-            # fix cur_traj to last seen, exit
-            cur_traj[i+1:, :] = observed_state_to_vector
-            break
+    for motion_id, file_path in motion_files_ids.items():
+
+        expert_trajectory = load_motion_file(file_path, sim_timestep=sim_timestep, frame_duration_override=0.04)
+        states, actions = expert_trajectory_to_states_actions(expert_trajectory=expert_trajectory,
+                                                                  trajectory_movement_id=motion_id, num_repeats=1,
+                                                                    sim_timestep=sim_timestep)
+        all_states.append(states)
+        all_actions.append(actions)
     
-    # calculate rewards, do gradient improve, do another loop with aggregated data
+    all_states = np.vstack(all_states)
+    all_actions = np.vstack(all_actions)
+
+    N = all_states.shape[0]
+    # we will do behavioral cloning where we pass in a state including a phase variable and the current orientation and angular velocity
+    # we will get out next target angles for motor
+    # maybe we will do that across movements and add in a target command, but let's save that for round 2
+    loss_values = jnp.zeros(num_epochs + 1)
+    loss_values = loss_values.at[0].set(loss(params, all_states, all_actions))
+    for epoch in tqdm(range(num_epochs)):
+        start_time = time.time()
+        key, key_shuffle = jax.random.split(key, 2)
+        state_shuffled = jax.random.permutation(key_shuffle, all_states)
+        action_shuffled = jax.random.permutation(key_shuffle, all_actions)  # re-use the random key
+        k = 0
+        while k < N:
+            # Sample
+            state_batch = state_shuffled[k:k+batch_size]
+            action_batch = action_shuffled[k:k+batch_size]
+            k += batch_size
+            
+            params = update(params, state_batch, action_batch)
+        
+        loss_values = loss_values.at[epoch+1].set(loss(params, state_shuffled, action_shuffled))
+        epoch_time = time.time() - start_time
+
+        print("Epoch {} in {:0.2f} sec".format(epoch, epoch_time))
+        print("Loss: {}".format(loss_values[epoch+1]))
+
+    fig, ax = plt.subplots()
+    loss_as_np_arr = np.asarray(loss_values)
+    epochs = list(range(num_epochs + 1))
+    ax.plot(epochs, loss_as_np_arr)
+    ax.set_xlabel("epoch_number")
+    ax.set_ylabel("loss")
+    ax.set_title(f"Loss per Epoch, Behavioral Cloning, alpha={STEP_SIZE}")
+    fig.savefig(os.path.join(cache_dir, "bc_loss_vs_epochs.png"))
+
+    for (i, (w, b)) in zip(range(len(params)), params):
+        w_arr = np.asarray(w)
+        b_arr = np.asarray(b)
+        weights_file_path = os.path.join(cache_dir, f"weights_{i}_w.npy")
+        np.save(weights_file_path, w_arr)
+        biases_file_path = os.path.join(cache_dir, f"weights_{i}_b.npy")
+        np.save(biases_file_path, b_arr)
+       
+
+def test_scenario(motions_and_ids: Dict[int, str],
+                  motion_id: int,
+                  cache_dir: str = "/home/mz/quadruped_learning/motion_learning/bc_cache",
+                  sim_timestep: float = 0.005):
+    file_path = motions_and_ids[motion_id]
+    expert_trajectory = load_motion_file(file_path, sim_timestep=sim_timestep, frame_duration_override=0.04)
+    states, actions = expert_trajectory_to_states_actions(expert_trajectory=expert_trajectory,
+                                                                  trajectory_movement_id=motion_id, num_repeats=1,
+                                                                    sim_timestep=sim_timestep)
+    cache_files = os.listdir(cache_dir)
+    weights_files = [file for file in cache_files if file.endswith(".npy") and file.startswith("weights_")]
+    params = []
+    for i in range(len(weights_files)//2):
+        expected_weights_name = f"weights_{i}_w.npy"
+        weights_file = os.path.join(cache_dir, expected_weights_name)
+        weights_arr = np.load(weights_file)
+        expected_biases_file_name = f"weights_{i}_b.npy"
+        bias_file = os.path.join(cache_dir, expected_biases_file_name)
+        bias_arr = np.load(bias_file)
+        params.append((jnp.array(weights_arr), jnp.array(bias_arr)))
+    env = build_env(reference_motions=[expert_trajectory],
+              enable_rendering=True, show_reference_motion=True, sim_time_step=sim_timestep)
+    env.reset()
+    observation = env.get_observation()
+    phases = states[:, 0]
+    cur_state = observation_to_state(observation, motion_id, phases[0])
+    for i in range(len(phases) - 1):
+        
+        motor_angles = predict(params, cur_state)
+        true_motor_angles = states[i, 1 + 1 + len(observation.base_orientation_euler) + len(observation.base_angular_velocity):]
+        pos = INIT_POS
+        rot = INIT_ROT
+        pose = Pose(pos, rot, true_motor_angles)
+        env.set_ref_model_pose(pose)
+
+        observation = env.step_me(
+                motor_angles)
+        cur_state = observation_to_state(observation, motion_id, phases[i+1])
+    
 
 
 if __name__ == "__main__":
@@ -165,80 +248,15 @@ if __name__ == "__main__":
     if example_traj:
         expert_trajectory = load_motion_file("/home/mz/quadruped_learning/data_retargetted_motion/pace.txt", sim_timestep=0.005, frame_duration_override=0.04)
         num_frames, all_states, all_actions = expert_trajectory_to_states_actions(expert_trajectory=expert_trajectory, num_repeats=5)
-    example_train = True
+    example_train = False
+    motion_files_ids = {0: "/home/mz/quadruped_learning/data_retargetted_motion/pace.txt",
+                        1: "/home/mz/quadruped_learning/data_retargetted_motion/canter.txt",
+                        2: "/home/mz/quadruped_learning/data_retargetted_motion/left turn0.txt",
+                        3: "/home/mz/quadruped_learning/data_retargetted_motion/right turn0.txt",
+                        4: "/home/mz/quadruped_learning/data_retargetted_motion/trot.txt"}
     if example_train:
-        motion_file="/home/mz/quadruped_learning/data_retargetted_motion/pace.txt"
-        train(motion_file)
+        train(motion_files_ids)
+    example_test = True
+    if example_test:
+       test_scenario(motion_files_ids, motion_id=0)
 
-
-
-# # Define estimator as a neural network
-# def f_hat(x, θ):
-#     Ws, bs = θ['W'], θ['b']
-#     y = Ws[0]*x + bs[0]  # assumes `x` is a scalar
-#     for (W, b) in zip(Ws[1:], bs[1:]):
-#         y = W@jax.nn.relu(y) + b
-#     return y
-
-# # Define loss function and gradient
-# loss = lambda θ, X, Y: jnp.mean((Y - jax.vmap(f_hat, in_axes=(0, None))(X, θ))**2)
-# grad_loss = jax.jit(jax.grad(loss, argnums=0))  # args like `loss`, outputs like `θ`
-# loss = jax.jit(loss)
-
-
-# key, *keys_W = jax.random.split(key, len(hidden_dims) + 2)
-# key, *keys_b = jax.random.split(key, len(hidden_dims) + 2)
-# θ = {
-#     'W': [
-#         0.1*jax.random.normal(keys_W[0], (hidden_dims[0],)),
-#         0.1*jax.random.normal(keys_W[1], (hidden_dims[1], hidden_dims[0])),
-#         0.1*jax.random.normal(keys_W[2], (hidden_dims[1],)),
-#     ],
-#     'b': [
-#         0.1*jax.random.normal(keys_b[0], (hidden_dims[0],)),
-#         0.1*jax.random.normal(keys_b[1], (hidden_dims[1],)),
-#         0.1*jax.random.normal(keys_b[2]),
-#     ],
-# }
-
-
-# # Initialize gradient-based optimizer
-# learning_rate = 1e-3
-# init_opt, update_opt, get_params = optimizers.adam(learning_rate)
-# opt_state = init_opt(θ)
-# idx = 0
-
-# @jax.jit
-# def training_step(idx, opt_state, X, Y):
-#     θ = get_params(opt_state)
-#     grads = grad_loss(θ, X, Y)
-#     opt_state = update_opt(idx, grads, opt_state)
-#     return opt_state
-
-# # Do batch stochastic gradient descent
-# batch = 20
-# epochs = 100
-# loss_values = jnp.zeros(epochs + 1)
-# loss_values = loss_values.at[0].set(loss(θ, x, y))
-
-# for i in tqdm(range(epochs)):
-#     # Shuffle the data
-#     key, key_shuffle = jax.random.split(key, 2)
-#     x_shuffled = jax.random.permutation(key_shuffle, x)
-#     y_shuffled = jax.random.permutation(key_shuffle, y)  # re-use the random key
-    
-#     # Do batch gradient descent
-#     k = 0
-#     while k < N:
-#         # Sample
-#         x_batch = x_shuffled[k:k+batch]
-#         y_batch = y_shuffled[k:k+batch]
-#         k += batch
-        
-#         # Gradient step
-#         opt_state = training_step(idx, opt_state, x_batch, y_batch)
-#         idx += 1
-        
-#     # Record loss on all data at the end of the epoch
-#     θ = get_params(opt_state)
-#     loss_values = loss_values.at[i+1].set(loss(θ, x, y))
