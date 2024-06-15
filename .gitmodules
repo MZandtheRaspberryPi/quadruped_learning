@@ -1,0 +1,3 @@
+[submodule "pi_firmware/pi_i2c"]
+	path = pi_firmware/pi_i2c
+	url = git@github.com:MZandtheRaspberryPi/pi_i2c.git

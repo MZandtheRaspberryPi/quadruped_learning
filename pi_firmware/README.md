@@ -1,0 +1,1 @@
+docker build -t bittle:2024-6-15 -f .\Dockerfile --progress=plain .
