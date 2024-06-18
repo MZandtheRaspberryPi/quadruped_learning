@@ -31,7 +31,7 @@ int main() {
   uint16_t cur_servo_val = 4094 / 2;
   bool increase_angle = true;
   const uint16_t min_val = 1000;
-  const uint16_t max_val = 3000;
+  const uint16_t max_val = 2000;
   const uint16_t step_val = 1;
   const uint8_t pin_num = 0;
   for (uintmax_t i = 0; i < sample_num; i++) {
@@ -39,7 +39,7 @@ int main() {
     if (i % 500 == 0) {
         std::cout << "ax: " << ax << " ay: " << ay << " az: " << az << std::endl;
     }
-    motor_driver.setPin(pin_num, cur_servo_val, false);
+    motor_driver.writeMicroseconds(pin_num, cur_servo_val);
     if (increase_angle)
     {
         cur_servo_val += step_val;
