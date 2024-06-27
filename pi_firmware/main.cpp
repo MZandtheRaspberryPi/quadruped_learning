@@ -11,7 +11,7 @@ int main() {
   uint8_t mpu_address = MPU6050_DEFAULT_ADDRESS;
   I2CLinuxAPI i2c_dev(i2c_name);
   i2c_dev.begin();
-  uint8_t num_servos = 8;
+  uint8_t num_servos = 16;
   ServoBoardConfig servo_config = ServoBoardConfig(num_servos);
   Adafruit_PWMServoDriver_Wrapper motor_driver(PCA9685_I2C_ADDRESS, &i2c_dev);
   ServoController servo_controller = ServoController(&servo_config,
