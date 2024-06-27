@@ -8,7 +8,7 @@ COPY pi_i2c /tmp/pi_i2c
 COPY CMakeLists.txt /tmp/CMakeLists.txt
 COPY main.cpp /tmp/
 WORKDIR /tmp/build
-RUN cmake ..
+RUN cmake .. -DCOMPILE_WARNING_AS_ERROR=ON
 RUN make
 RUN ls -ltrh
 RUN ls -ltrh pi_i2c
