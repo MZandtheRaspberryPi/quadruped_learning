@@ -32,6 +32,7 @@ int main() {
   const uintmax_t samples_per_second = 200;
   const int64_t sleep_ms = 1000 / (int64_t)samples_per_second;
   uint64_t sensor_start, sensor_end, servo_start, servo_end, total_sensor, total_servo;
+  total_sensor = total_servo = 0;
   servo_start = millis();
   for (uintmax_t i = 0; i < num_servos; i++)
   {
