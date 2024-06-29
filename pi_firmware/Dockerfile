@@ -14,4 +14,8 @@ RUN ls -ltrh
 RUN ls -ltrh pi_i2c
 
 FROM ubuntu:22.04
-COPY --from=build /tmp/build/main /main
+RUN mkdir /quadruped
+WORKDIR /quadruped
+COPY --from=build /tmp/build/main /quadruped/main
+COPY --from=build /tmp/build/pi_i2c/set_angle /quadruped/set_angle
+COPY --from=build /tmp/build/pi_i2c/set_pwm /quadruped/set_pwm
