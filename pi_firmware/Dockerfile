@@ -6,7 +6,8 @@ RUN apt-get install i2c-tools nano git libi2c-dev libboost-all-dev cmake build-e
 RUN mkdir /tmp/build
 COPY pi_i2c /tmp/pi_i2c
 COPY CMakeLists.txt /tmp/CMakeLists.txt
-COPY main.cpp /tmp/
+COPY include/ /tmp/include
+COPY src/ /tmp/src/
 WORKDIR /tmp/build
 RUN cmake .. -DCOMPILE_WARNING_AS_ERROR=ON
 RUN make

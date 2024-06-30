@@ -7,6 +7,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/pi_i2c)
 
-add_executable(main main.cpp)
+add_executable(main src/main.cpp)
+target_include_directories(main PUBLIC include)
+
 
 target_link_libraries(main PUBLIC pi_i2c_lib)
