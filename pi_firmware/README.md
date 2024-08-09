@@ -30,3 +30,42 @@ When I tested my setup which is a Bittle with metal geared servos, Nyboard v1.2,
 |front_left_shoulder|14|increasing the pwm moves the knee toward the body|
 |front_left_knee|15|increasing the pwm moves the foot away from the body|
 |head_joint|12|increasing the pwm moves the head to the left|
+
+How does the Bittle command a joint to a certain angle? Often with these servos they are controlled by how long a pulse is held high, in microseconds. Servos typically have a range of 180 degrees, and a pulse of 1000 microseconds high may correspond to 0, 1500 to 90 degrees, and 2000 to 180 degrees. The Bittle's servos have 270 degrees of motion, and 500-2500 microsecond pulse range. However, this microseconds is a bit tricky because with the PCA9685, we actually control them with a 4096 step signal. How many steps the signal is high determines the angle. This takes into account that we could be running the servos at different frequencies, where the 4096 step signal may happen X number of times per second.
+
+The Bittle complicates this slightly. In the Bittle's coordinate system 0 degrees rotation means the shoulders are perpendicular to the ground, and the knees are parallel to the ground. In servo terms this does not correspond to a 1500 microsecond pulse, or the mid point of the 4096 step signal. We install the servos into the Bittle with some offset to allow for different ranges of motion for each joint. 
+
+
+## Printing Arduino's EEPROM
+https://docs.petoi.com/arduino-ide/upload-sketch-for-nyboard
+https://github.com/PetoiCamp/OpenCat
+
+I uploaded a script that waits for some message on the serial port and then prints out the eeprom. However, while trying to revert
+this I bricked the robot and had to flash the bootloader, then the not main module and do calibrations, then the main module. Then
+it worked again.
+
+For convenience I included a dump of the arduino memory in this directory, `arduino_eeprom.txt` so that others don't have to risk this. Note that some values will change for your bittle, like servo calibration.
+
+```c++
+...
+#define OTHER_MODULES  //uncomment this line to disable the gyroscope code to save programming resources for other modules.
+...
+void setup() {
+  Serial.begin(BAUD_RATE);
+  Serial.setTimeout(SERIAL_TIMEOUT);
+  while (!Serial.available()) {delay(50);};
+  printEEPROM();
+  // while (Serial.available() && Serial.read());  // empty buffer
+
+  // join I2C bus (I2Cdev library doesn't do this automatically)
+  //#if I2CDEV_IMPLEMENTATION == I2CDEV_ARDUINO_WIRE
+  Wire.begin();
+  //  TWBR = 24; // 400kHz I2C clock (200kHz if CPU is 8MHz)
+  Wire.setClock(500000L);
+  //#elif I2CDEV_IMPLEMENTATION == I2CDEV_BUILTIN_FASTWIRE
+  //  Fastwire::setup(400, true);
+  //#endif
+  initRobot();
+}
+...
+```

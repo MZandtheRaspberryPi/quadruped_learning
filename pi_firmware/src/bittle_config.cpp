@@ -23,6 +23,52 @@ Connector wire	7mm/17mm
 Spline count	25
 
 */
+
+std::map<BittleJoint, uint8_t> get_bittle_joint_to_servo_num_mapping()
+{
+    std::map<BittleJoint, uint8_t> mapping;
+    mapping[BittleJoint::BACK_LEFT_KNEE] = 0;
+    mapping[BittleJoint::BACK_LEFT_SHOULDER] = 1;
+    mapping[BittleJoint::BACK_RIGHT_SHOULDER] = 2;
+    mapping[BittleJoint::BACK_RIGHT_KNEE] = 3;
+    mapping[BittleJoint::FRONT_RIGHT_KNEE] = 4;
+    mapping[BittleJoint::FRONT_RIGHT_SHOULDER] = 5;
+    mapping[BittleJoint::FRONT_LEFT_SHOULDER] = 6;
+    mapping[BittleJoint::FRONT_LEFT_KNEE] = 7;
+    mapping[BittleJoint::HEAD_JOINT] = 8;
+    return mapping;
+}
+std::map<BittleJoint, uint8_t> get_bittle_joint_to_pwm_pin_mapping()
+{
+    std::map<BittleJoint, uint8_t> mapping;
+    mapping[BittleJoint::BACK_LEFT_KNEE] = 0;
+    mapping[BittleJoint::BACK_LEFT_SHOULDER] = 1;
+    mapping[BittleJoint::BACK_RIGHT_SHOULDER] = 6;
+    mapping[BittleJoint::BACK_RIGHT_KNEE] = 7;
+    mapping[BittleJoint::FRONT_RIGHT_KNEE] = 8;
+    mapping[BittleJoint::FRONT_RIGHT_SHOULDER] = 9;
+    mapping[BittleJoint::FRONT_LEFT_SHOULDER] = 14;
+    mapping[BittleJoint::FRONT_LEFT_KNEE] = 15;
+    mapping[BittleJoint::HEAD_JOINT] = 12;
+    return mapping;
+}
+
+std::map<BittleJoint, uint8_t> get_bittle_joint_to_bittle_array_idx_mapping()
+{
+    std::map<BittleJoint, uint8_t> mapping;
+    mapping[BittleJoint::BACK_LEFT_KNEE] = 15;
+    mapping[BittleJoint::BACK_LEFT_SHOULDER] = 11;
+    mapping[BittleJoint::BACK_RIGHT_SHOULDER] = 10;
+    mapping[BittleJoint::BACK_RIGHT_KNEE] = 14;
+    mapping[BittleJoint::FRONT_RIGHT_KNEE] = 13;
+    mapping[BittleJoint::FRONT_RIGHT_SHOULDER] = 9;
+    mapping[BittleJoint::FRONT_LEFT_SHOULDER] = 8;
+    mapping[BittleJoint::FRONT_LEFT_KNEE] = 12;
+    mapping[BittleJoint::HEAD_JOINT] = 0;
+    return mapping;
+}
+
+
 ServoBoardConfig make_bittle_config()
 {
 
@@ -35,7 +81,40 @@ ServoBoardConfig make_bittle_config()
     //                float32_t max_angle_to_command = M_PI/2,
     //                uint16_t min_pulsewidth_to_command = 500,
     //                uint16_t max_pulsewidth_to_command = 2500);
-    ServoBoardConfig bittle_config(9);
+    ServoBoardConfig bittle_config(BITTLE_NUM_SERVOS);
+
+    std::map<BittleJoint, uint8_t> joint_pwm_map = get_bittle_joint_to_pwm_pin_mapping();
+    std::map<BittleJoint, uint8_t> joint_servo_num_map = get_bittle_joint_to_servo_num_mapping();
+    std::map<BittleJoint, uint8_t> joint_bittle_idx_map = get_bittle_joint_to_bittle_array_idx_mapping();
+
+
+    for (uint8_t i = BITTLE_NUM_SERVOS; i < BITTLE_NUM_SERVOS; i++)
+    {
+        BittleJoint joint = static_cast<BittleJoint>(i);
+        uint8_t servo_num = joint_servo_num_map[joint];
+        uint8_t pwm_num = joint_pwm_map[joint];
+        bittle_config.set_servo_pwm_pin_num(servo_num, pwm_num);
+        if (joint == BittleJoint::BACK_LEFT_KNEE || joint == BittleJoint::BACK_RIGHT_KNEE ||
+                     joint == BittleJoint::FRONT_RIGHT_KNEE ||
+                 joint == BittleJoint::FRONT_LEFT_KNEE)
+        {
+            bittle_config.set_servo_angular_range(servo_num, 180);
+        }
+
+        uint8_t bittle_arr_idx = joint_bittle_idx_map[joint];
+        bool is_servo_inverted = rotationDirection[bittle_arr_idx] == -1;
+        float32_t min_angle = angleLimit[bittle_arr_idx][0];
+        float32_t max_angle = angleLimit[bittle_arr_idx][1];
+        float32_t mid_pos = middleShift[bittle_arr_idx];
+
+        bittle_config.set_zero_position(servo_num, mid_pos);
+        bittle_config.set_invert_servo_flag(servo_num, is_servo_inverted);
+        bittle_config.set_min_angle(servo_num, min_angle);
+        bittle_config.set_max_angle(servo_num, max_angle);
+
+    }
+
     return bittle_config;
 
 }
+

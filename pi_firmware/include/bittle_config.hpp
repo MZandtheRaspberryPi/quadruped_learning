@@ -1,35 +1,26 @@
 #ifndef __BITTLE_CONFIG__
 #define __BITTLE_CONFIG__
 
+#include<map>
+
 #include <servo_controller.hpp>
 
-// enum mapping a bittle joint to which pin of the
-// pca9685 chip
-enum JointPin {
-  BACK_LEFT_KNEE = 0,
-  BACK_LEFT_SHOULDER = 1,
-  BACK_RIGHT_SHOULDER = 6,
-  BACK_RIGHT_KNEE = 7,
-  FRONT_RIGHT_KNEE = 8,
-  FRONT_RIGHT_SHOULDER = 9,
-  FRONT_LEFT_SHOULDER = 14,
-  FRONT_LEFT_KNEE = 15,
-  HEAD_JOINT = 12
+static const uint8_t BITTLE_NUM_SERVOS = 9;
+
+enum BittleJoint {
+  BACK_LEFT_KNEE,
+  BACK_LEFT_SHOULDER,
+  BACK_RIGHT_SHOULDER,
+  BACK_RIGHT_KNEE,
+  FRONT_RIGHT_KNEE,
+  FRONT_RIGHT_SHOULDER,
+  FRONT_LEFT_SHOULDER,
+  FRONT_LEFT_KNEE,
+  HEAD_JOINT
 };
 
-// enum mapping a bittle joint to the index in the petoi
-// configs below
-enum JointBittleIndex {
-  HEAD_JOINT_IDX = 0,
-  BACK_LEFT_KNEE_IDX = 15,
-  BACK_LEFT_SHOULDER_IDX = 11,
-  BACK_RIGHT_SHOULDER_IDX = 10,
-  BACK_RIGHT_KNEE_IDX = 14,
-  FRONT_RIGHT_KNEE_IDX = 13,
-  FRONT_RIGHT_SHOULDER_IDX = 9,
-  FRONT_LEFT_SHOULDER_IDX = 8,
-  FRONT_LEFT_KNEE_IDX = 12
-};
+// below are constants pulled from bittle source code
+// indexing these are tricky, look to function get_bittle_joint_to_bittle_array_idx_mapping for help
 
 // https://www.petoi.camp/forum/software/about-calibration-state
 // "There's some rescaling and calibration algorithm in the code before sending the neutral position to the servos."
@@ -72,6 +63,9 @@ uint8_t pwm_pin[] = { 12, 11, 4, 3,
 #define DEVICE_ADDRESS 0x54
 #define BAUD_RATE 115200
 
+std::map<BittleJoint, uint8_t> get_bittle_joint_to_servo_num_mapping();
+std::map<BittleJoint, uint8_t> get_bittle_joint_to_pwm_pin_mapping();
+std::map<BittleJoint, uint8_t> get_bittle_joint_to_bittle_array_idx_mapping();
 ServoBoardConfig make_bittle_config();
 
 #endif
