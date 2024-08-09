@@ -10,9 +10,21 @@ sudo docker run -it --device /dev/i2c-1 mzandtheraspberrypi/bittle:2024-6-15
 # setting up the pi
 1. Ensure that the line enable_uart=1 is uncommented in the /boot/firmware/config.txt file, it should be by default.
 2. remove any reference to console in /boot/firmware/cmdline.txt, ie remove console=serial0,115200.
-3. disable the serial console sudo systemctl stop serial-getty@ttyS0.service && sudo systemctl disable serial-getty@ttyS0.service
-4. change i2c to operate at 400khz instead of the default 100khz. If we have a loop rate of 200hz, for motors We will be sending 8 motor commands, 16 bits per motor is 25.6kbps. If we read 6 values from the accelerometer, and each is 16 bits, and we read 200 times a second that is 19.2kbps. Total we are at about 50kbps.
+3. disable the serial console `sudo systemctl stop serial-getty@ttyS0.service && sudo systemctl disable serial-getty@ttyS0.service`
+4. change i2c to operate at 400khz instead of the default 100khz. This will help our i2c master clock go faster and let us push more data through.
 5. install docker and other stuff by running `setup_pi.sh` in this repo and then rebooting the pi with something like `sudo reboot`.
+6. if you will use lot's of memory, allocate a swap file, in ubuntu for example:  
+```
+sudo fallocate -l 512M /swapfile
+sudo chmod 600 /swapfile
+sudo mkswap /swapfile
+sudo swapon /swapfile
+sudo swapon --show
+echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+sudo sysctl vm.swappiness=2
+sudo reboot
+sudo swapon --show
+```
 
 # notes on the bittle joint angles
 I installed my servos as per the Bittle setup instructions, with Nyboard v1.2. The installation directions are below, note that the numbers here do not correspond to PCA9685 pin numbers:  
