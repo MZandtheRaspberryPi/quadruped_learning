@@ -1,7 +1,7 @@
 FROM ubuntu:22.04 AS build
 
 RUN apt-get update
-RUN apt-get install i2c-tools nano git libi2c-dev libboost-all-dev cmake build-essential g++ -y
+RUN apt-get install i2c-tools nano git libi2c-dev libboost-all-dev cmake build-essential g++ valgrind -y
 
 RUN mkdir /tmp/build
 COPY pi_i2c /tmp/pi_i2c
