@@ -13,8 +13,8 @@ int main() {
   uint8_t mpu_address = MPU6050_DEFAULT_ADDRESS;
   I2CLinuxAPI i2c_dev(i2c_name);
   i2c_dev.begin();
-  uint8_t num_servos = 16;
-  ServoBoardConfig servo_config = ServoBoardConfig(num_servos);
+  ServoBoardConfig servo_config = make_bittle_config();
+
   Adafruit_PWMServoDriver_Wrapper motor_driver(PCA9685_I2C_ADDRESS, &i2c_dev);
   ServoController servo_controller = ServoController(&servo_config,
                                  &motor_driver);
@@ -36,7 +36,7 @@ int main() {
   uint64_t sensor_start, sensor_end, servo_start, servo_end, total_sensor, total_servo;
   total_sensor = total_servo = 0;
   servo_start = millis();
-  for (uintmax_t i = 0; i < num_servos; i++)
+  for (uintmax_t i = 0; i < servo_config.get_num_servos(); i++)
   {
       servo_controller.set_servo_angle(i, 0);
   }
@@ -54,7 +54,7 @@ int main() {
     if (i == sample_num / 2)
     {
       servo_start = millis();
-      for (uintmax_t i = 0; i < num_servos; i++)
+      for (uintmax_t i = 0; i < servo_config.get_num_servos(); i++)
       {
           servo_controller.set_servo_angle(i, M_PI/8);
       }
