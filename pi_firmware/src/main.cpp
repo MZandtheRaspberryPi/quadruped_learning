@@ -17,7 +17,8 @@ int main() {
 
   Adafruit_PWMServoDriver_Wrapper motor_driver(PCA9685_I2C_ADDRESS, &i2c_dev);
   ServoController servo_controller = ServoController(&servo_config,
-                                 &motor_driver);
+                                 &motor_driver,
+                                 false);
   MPU6050 accelgyro(mpu_address, &i2c_dev);
   if ( accelgyro.testConnection() )
     printf("MPU6050 connection test successful\n") ;
