@@ -14,6 +14,8 @@ int main() {
   I2CLinuxAPI i2c_dev(i2c_name);
   i2c_dev.begin();
   ServoBoardConfig servo_config = make_bittle_config();
+  std::string log_str = servo_config.to_string();
+  std::cout << log_str << std::endl;
 
   Adafruit_PWMServoDriver_Wrapper motor_driver(PCA9685_I2C_ADDRESS, &i2c_dev);
   ServoController servo_controller = ServoController(&servo_config,
