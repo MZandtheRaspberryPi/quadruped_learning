@@ -72,7 +72,7 @@ std::map<BittleJoint, uint8_t> get_bittle_joint_to_bittle_array_idx_mapping()
 ServoBoardConfig make_bittle_config()
 {
 
-    ServoBoardConfig bittle_config(BITTLE_NUM_SERVOS, -120, 120, 0, false, 270, 500, 2500,
+    ServoBoardConfig bittle_config(BittleJoint::LENGTH, -120, 120, 0, false, 270, 500, 2500,
         150, 600, 240, 25000000);
 
     std::map<BittleJoint, uint8_t> joint_pwm_map = get_bittle_joint_to_pwm_pin_mapping();
@@ -80,7 +80,7 @@ ServoBoardConfig make_bittle_config()
     std::map<BittleJoint, uint8_t> joint_bittle_idx_map = get_bittle_joint_to_bittle_array_idx_mapping();
 
 
-    for (uint8_t i = BITTLE_NUM_SERVOS; i < BITTLE_NUM_SERVOS; i++)
+    for (uint8_t i = 0; i < BittleJoint::LENGTH; i++)
     {
         BittleJoint joint = static_cast<BittleJoint>(i);
         uint8_t servo_num = joint_servo_num_map[joint];

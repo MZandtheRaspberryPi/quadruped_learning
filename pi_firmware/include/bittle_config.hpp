@@ -20,7 +20,9 @@ enum BittleJoint {
   FRONT_RIGHT_SHOULDER,
   FRONT_LEFT_SHOULDER,
   FRONT_LEFT_KNEE,
-  HEAD_JOINT
+  HEAD_JOINT,
+  // this has to go at the end so we can count the joints
+  LENGTH
 };
 
 // below are constants pulled from bittle source code
