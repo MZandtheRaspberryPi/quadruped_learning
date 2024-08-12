@@ -72,16 +72,8 @@ std::map<BittleJoint, uint8_t> get_bittle_joint_to_bittle_array_idx_mapping()
 ServoBoardConfig make_bittle_config()
 {
 
-    // ServoBoardConfig bittle_config(9,
-    //                -120,
-    //                 220,
-    //                0,
-    //                false,
-    //                float32_t min_angle_to_command = -M_PI/2,
-    //                float32_t max_angle_to_command = M_PI/2,
-    //                uint16_t min_pulsewidth_to_command = 500,
-    //                uint16_t max_pulsewidth_to_command = 2500);
-    ServoBoardConfig bittle_config(BITTLE_NUM_SERVOS);
+    ServoBoardConfig bittle_config(BITTLE_NUM_SERVOS, -120, 120, 0, false, 270, 500, 2500,
+        150, 600, 240, 25000000);
 
     std::map<BittleJoint, uint8_t> joint_pwm_map = get_bittle_joint_to_pwm_pin_mapping();
     std::map<BittleJoint, uint8_t> joint_servo_num_map = get_bittle_joint_to_servo_num_mapping();
