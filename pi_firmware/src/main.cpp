@@ -53,6 +53,7 @@ int main() {
     total_sensor += sensor_end - sensor_start;
     if (i % 500 == 0) {
         std::cout << "ax: " << ax << " ay: " << ay << " az: " << az << std::endl;
+        std::cout << "gx: " << gx << " gy: " << gy << " gz: " << gz << std::endl;
     }
     if (i == sample_num / 2)
     {
