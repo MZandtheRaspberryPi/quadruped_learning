@@ -41,7 +41,7 @@ int main() {
   servo_start = millis();
   for (uintmax_t i = 0; i < servo_config.get_num_servos(); i++)
   {
-      servo_controller.set_servo_angle(i, 0);
+      // servo_controller.set_servo_angle(i, 0);
   }
   servo_end = millis();
   total_servo += servo_end - servo_start;
@@ -59,7 +59,7 @@ int main() {
       servo_start = millis();
       for (uintmax_t i = 0; i < servo_config.get_num_servos(); i++)
       {
-          servo_controller.set_servo_angle(i, M_PI/8);
+          // servo_controller.set_servo_angle(i, M_PI/8);
       }
       servo_end = millis();
       total_servo += servo_end - servo_start;

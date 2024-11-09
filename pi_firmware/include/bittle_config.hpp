@@ -9,8 +9,6 @@
 #define DEVICE_ADDRESS 0x54
 #define BAUD_RATE 115200
 
-static const uint8_t BITTLE_NUM_SERVOS = 9;
-
 enum BittleJoint {
   BACK_LEFT_KNEE,
   BACK_LEFT_SHOULDER,

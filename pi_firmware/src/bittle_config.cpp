@@ -86,12 +86,12 @@ ServoBoardConfig make_bittle_config()
         uint8_t servo_num = joint_servo_num_map[joint];
         uint8_t pwm_num = joint_pwm_map[joint];
         bittle_config.set_servo_pwm_pin_num(servo_num, pwm_num);
-        if (joint == BittleJoint::BACK_LEFT_KNEE || joint == BittleJoint::BACK_RIGHT_KNEE ||
-                     joint == BittleJoint::FRONT_RIGHT_KNEE ||
-                 joint == BittleJoint::FRONT_LEFT_KNEE)
-        {
-            bittle_config.set_servo_angular_range(servo_num, 180);
-        }
+        // if (joint == BittleJoint::BACK_LEFT_KNEE || joint == BittleJoint::BACK_RIGHT_KNEE ||
+        //              joint == BittleJoint::FRONT_RIGHT_KNEE ||
+        //          joint == BittleJoint::FRONT_LEFT_KNEE)
+        // {
+        //     bittle_config.set_servo_angular_range(servo_num, 180);
+        // }
 
         uint8_t bittle_arr_idx = joint_bittle_idx_map[joint];
         bool is_servo_inverted = rotationDirection[bittle_arr_idx] == -1;
