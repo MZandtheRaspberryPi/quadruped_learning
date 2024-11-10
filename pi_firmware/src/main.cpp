@@ -8,7 +8,7 @@
 
 #include "bittle_config.hpp"
 
-int main() {
+int main(int argc, char* argv[]) {
   std::string i2c_name = "/dev/i2c-1";
   uint8_t mpu_address = MPU6050_DEFAULT_ADDRESS;
   I2CLinuxAPI i2c_dev(i2c_name);

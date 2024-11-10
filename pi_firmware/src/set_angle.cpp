@@ -8,7 +8,7 @@
 
 #include "bittle_config.hpp"
 
-int main() {
+int main(int argc, char* argv[]) {
 
   if (argc < 3) {
     std::cout << "Usage: " << argv[0] << " servo_num angle" << std::endl;
