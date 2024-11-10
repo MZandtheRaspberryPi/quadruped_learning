@@ -30,10 +30,35 @@ enum BittleJoint {
 // "There's some rescaling and calibration algorithm in the code before sending the neutral position to the servos."
 // namely the middle point of the pwm signal, 1500, (500-2500), does not correspond to zero degrees using the bittle
 // defaults because of this shifting below, and also calibration
+
+// these are the bittle ones
+// static constexpr int8_t middleShift[] = { 0, 15, 0, 0,
+//                          -45, -45, -45, -45,
+//                          55, 55, -55, -55,
+//                          -55, -55, -55, -55 };
+
+// in my scheme i need these ones, note the indices are given in the bittle_config.cpp file in a function
+
+std::map<BittleJoint, uint8_t> get_bittle_joint_to_bittle_array_idx_mapping()
+{
+    std::map<BittleJoint, uint8_t> mapping;
+    mapping[BittleJoint::BACK_LEFT_KNEE] = 15;
+    mapping[BittleJoint::BACK_LEFT_SHOULDER] = 11;
+    mapping[BittleJoint::BACK_RIGHT_SHOULDER] = 10;
+    mapping[BittleJoint::BACK_RIGHT_KNEE] = 14;
+    mapping[BittleJoint::FRONT_RIGHT_KNEE] = 13;
+    mapping[BittleJoint::FRONT_RIGHT_SHOULDER] = 9;
+    mapping[BittleJoint::FRONT_LEFT_SHOULDER] = 8;
+    mapping[BittleJoint::FRONT_LEFT_KNEE] = 12;
+    mapping[BittleJoint::HEAD_JOINT] = 0;
+    return mapping;
+}
+
 static constexpr int8_t middleShift[] = { 0, 15, 0, 0,
                          -45, -45, -45, -45,
-                         55, 55, -55, -55,
+                         55, -55, 55, -55,
                          -55, -55, -55, -55 };
+
 static constexpr int angleLimit[][2] = {
   { -120, 120 },
   { -30, 80 },
