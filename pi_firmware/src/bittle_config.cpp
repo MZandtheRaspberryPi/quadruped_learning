@@ -73,7 +73,7 @@ ServoBoardConfig make_bittle_config()
 {
 
     ServoBoardConfig bittle_config(BittleJoint::LENGTH, -120, 120, 0, false, 270, 500, 2500,
-        150, 600, 240, 25000000);
+        0, 2500, 200, 25000000);
 
     std::map<BittleJoint, uint8_t> joint_pwm_map = get_bittle_joint_to_pwm_pin_mapping();
     std::map<BittleJoint, uint8_t> joint_servo_num_map = get_bittle_joint_to_servo_num_mapping();

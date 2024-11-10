@@ -14,3 +14,6 @@ target_link_libraries(${PROJECT_NAME}_lib PUBLIC pi_i2c_lib)
 
 add_executable(main src/main.cpp)
 target_link_libraries(main PUBLIC pi_i2c_lib ${PROJECT_NAME}_lib)
+
+add_executable(set_angle src/set_angle.cpp)
+target_link_libraries(set_angle PUBLIC pi_i2c_lib ${PROJECT_NAME}_lib)
