@@ -36,7 +36,7 @@ int main(int argc, char* argv[]) {
                                  false);
  
 
-  servo_controller.set_servo_angle(servo_num, 0);
+  servo_controller.set_servo_angle(servo_num, angle);
 
   i2c_dev.close();
   std::cout << "joint num " << std::string(argv[1]) << " servo_num " << std::to_string(servo_num) <<
